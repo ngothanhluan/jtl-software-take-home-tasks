@@ -131,6 +131,14 @@ tr:last-child td { border-bottom: 0; }
 .badge.pushback  { background: var(--amber-soft);  color: var(--amber);  border-color: transparent; }
 .badge.corrected { background: var(--violet-soft); color: var(--violet); border-color: transparent; }
 .badge.ai        { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.badge.unit      { background: var(--green-soft);  color: var(--green);  border-color: transparent; }
+.badge.api       { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.badge.manual    { background: var(--amber-soft);  color: var(--amber);  border-color: transparent; }
+
+/* Test case tables */
+td.tc { font-family: var(--mono); font-size: 13px; font-weight: 600; white-space: nowrap; }
+td.trace { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.gwt b { color: var(--muted); font-weight: 600; }
 
 /* Diagram cards (module graph) */
 .diagram { display: grid; gap: 14px; margin: 6px 0 16px; }

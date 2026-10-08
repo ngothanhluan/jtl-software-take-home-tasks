@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkTracker Test Plan</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main class="page">
+
+<header class="doc-header">
+  <div class="eyebrow">Test plan · Senior Backend take-home</div>
+  <h1>WorkTracker test plan</h1>
+  <p class="lede">The numbered cases that the implementation must satisfy. The candidate approves this plan before any code is written. Every test method name carries its case ID, and the manual UAT at the end is the final gate.</p>
+  <div class="meta">
+    <span class="chip">Date <strong>2026-10-08</strong></span>
+    <span class="chip">Status <strong>Draft, awaiting approval</strong></span>
+    <span class="chip">Spec <a href="2026-10-08-work-tracker-design.html"><strong>design spec</strong></a></span>
+    <span class="chip">Decisions <a href="../decisions.html"><strong>decisions.html</strong></a></span>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#approach">Approach</a></li>
+    <li><a href="#messages">Error messages under test</a></li>
+    <li><a href="#users">Users module (unit)</a></li>
+    <li><a href="#workitems">WorkItems module (unit)</a></li>
+    <li><a href="#api">API over HTTP (integration)</a></li>
+    <li><a href="#idempotency">Idempotency</a></li>
+    <li><a href="#uat">Manual UAT (human gate)</a></li>
+    <li><a href="#out">Not tested, on purpose</a></li>
+  </ol>
+</nav>
+
+<!-- 1 -->
+<section id="approach">
+  <h2><span class="num">01</span>Approach</h2>
+  <div class="legend">
+    <span class="badge unit">Unit</span>
+    <span class="badge api">Integration</span>
+    <span class="badge manual">Manual</span>
+  </div>
+  <ul>
+    <li><strong>Three layers.</strong> Unit tests cover domain rules and handlers. Integration tests run the real app through <code>WebApplicationFactory&lt;Program&gt;</code>. The candidate runs the manual UAT against the live service at the end.</li>
+    <li><strong>Traceability.</strong> Test method names start with the case ID, for example <code>TC_U04_Duplicate_username_ignoring_case_throws_ConflictException</code>. The "Traces to" column links each case to the spec section or decision it proves.</li>
+    <li><strong>TDD order.</strong> Cases are implemented in the order listed: domain first, then handlers, then HTTP, then idempotency. Each one is written, seen failing, then made to pass.</li>
+    <li><strong>No mocking framework.</strong> Handler tests use the real in-memory repositories and a hand-written stub for <code>IUsersApi</code>.</li>
+    <li><strong>A few illustrative tests, not full coverage.</strong> Rule variations (several invalid usernames, say) are rows of one <code>[Theory]</code>, not separate tests. That keeps the suite at <strong>26 cases</strong>.</li>
+  </ul>
+  <div class="table-wrap"><table>
+    <tr><th>Project</th><th>Cases</th><th>Kind</th></tr>
+    <tr><td><code>WorkTracker.Users.Tests</code></td><td>TC-U01 … TC-U05</td><td><span class="badge unit">Unit</span></td></tr>
+    <tr><td><code>WorkTracker.WorkItems.Tests</code></td><td>TC-W01 … TC-W06</td><td><span class="badge unit">Unit</span></td></tr>
+    <tr><td><code>WorkTracker.Api.Tests</code></td><td>TC-A01 … TC-A09, TC-I01 … TC-I06</td><td><span class="badge api">Integration</span> (TC-I05 and TC-I06 test <code>IdempotencyStore</code> directly)</td></tr>
+    <tr><td><code>requests.http</code></td><td>UAT-01 … UAT-10</td><td><span class="badge manual">Manual</span></td></tr>
+  </table></div>
+</section>
+
+<!-- 2 -->
+<section id="messages">
+  <h2><span class="num">02</span>Error messages under test</h2>
+  <p>The candidate asked for specific messages (<a href="../decisions.html">Q6</a>), so tests assert the exact text. Fixing it here means the wording is approved together with the cases.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Rule</th><th>HTTP</th><th>Message (<code>detail</code>)</th></tr>
+    <tr><td>Username empty or whitespace</td><td>400</td><td><code>Username is required.</code></td></tr>
+    <tr><td>Username length</td><td>400</td><td><code>Username must be between 3 and 32 characters.</code></td></tr>
+    <tr><td>Username characters</td><td>400</td><td><code>Username can only contain letters, digits, '.', '_' and '-'.</code></td></tr>
+    <tr><td>Username taken</td><td>409</td><td><code>Username 'alice' already exists.</code></td></tr>
+    <tr><td>User not found</td><td>404</td><td><code>User '{id}' was not found.</code></td></tr>
+    <tr><td>Work item name empty or whitespace</td><td>400</td><td><code>Work item name is required.</code></td></tr>
+    <tr><td>Work item name too long</td><td>400</td><td><code>Work item name must be at most 200 characters.</code></td></tr>
+    <tr><td>Assignee id empty</td><td>400</td><td><code>Assignee id is required.</code></td></tr>
+    <tr><td>Assignee does not exist</td><td>422</td><td><code>User '{id}' does not exist.</code></td></tr>
+    <tr><td>Idempotency-Key missing</td><td>400</td><td><code>Idempotency-Key header is required.</code></td></tr>
+    <tr><td>Key in progress</td><td>409</td><td><code>A request with this Idempotency-Key is already being processed.</code></td></tr>
+    <tr><td>Key reused for another request</td><td>422</td><td><code>Idempotency-Key was already used with a different request.</code></td></tr>
+  </table></div>
+  <p>The username in the 409 message is the one the client sent, so a duplicate <code>ALICE</code> reads <code>Username 'ALICE' already exists.</code></p>
+</section>
+
+<!-- 3 -->
+<section id="users">
+  <h2><span class="num">03</span>Users module <span class="badge unit">Unit</span></h2>
+  <p><code>WorkTracker.Users.Tests</code></p>
+  <div class="table-wrap"><table>
+    <tr><th>ID</th><th>Given / When / Then</th><th>Traces to</th></tr>
+    <tr><td class="tc">TC-U01</td><td class="gwt"><b>Given</b> <code>"  alice  "</code>, <code>"bob.smith"</code>, <code>"a_b-c"</code> <b>When</b> a <code>Username</code> is created <b>Then</b> it succeeds and <code>Value</code> is trimmed (<code>"alice"</code>).</td><td class="trace">Spec §03</td></tr>
+    <tr><td class="tc">TC-U02</td><td class="gwt"><b>Given</b> <code>""</code>, <code>"   "</code>, <code>"ab"</code>, a 33-character string, <code>"alice smith"</code>, <code>"al!ce"</code> <b>When</b> a <code>Username</code> is created <b>Then</b> it throws <code>DomainException</code> with the matching message from §02.</td><td class="trace">Spec §03, §06</td></tr>
+    <tr><td class="tc">TC-U03</td><td class="gwt"><b>Given</b> an empty repository <b>When</b> <code>CreateUserHandler</code> runs for <code>"alice"</code> <b>Then</b> it returns a <code>UserResponse</code> with a new non-empty id and username <code>"alice"</code>, and the repository finds the user by that id.</td><td class="trace">Spec §05</td></tr>
+    <tr><td class="tc">TC-U04</td><td class="gwt"><b>Given</b> <code>"alice"</code> already exists <b>When</b> the handler runs for <code>"ALICE"</code> <b>Then</b> it throws <code>ConflictException</code> <code>"Username 'ALICE' already exists."</code></td><td class="trace">Spec §06, Q6</td></tr>
+    <tr><td class="tc">TC-U05</td><td class="gwt"><b>Given</b> an empty repository <b>When</b> 20 tasks call <code>TryAddAsync</code> at once with different-case spellings of <code>"alice"</code> <b>Then</b> exactly one returns <code>true</code>.</td><td class="trace">Spec §07, Q7</td></tr>
+  </table></div>
+</section>
+
+<!-- 4 -->
+<section id="workitems">
+  <h2><span class="num">04</span>WorkItems module <span class="badge unit">Unit</span></h2>
+  <p><code>WorkTracker.WorkItems.Tests</code>. A stub <code>IUsersApi</code> returns a fixed answer, so these tests never load the Users module.</p>
+  <div class="table-wrap"><table>
+    <tr><th>ID</th><th>Given / When / Then</th><th>Traces to</th></tr>
+    <tr><td class="tc">TC-W01</td><td class="gwt"><b>Given</b> <code>"  Write README  "</code> and a 200-character string <b>When</b> a <code>WorkItemName</code> is created <b>Then</b> it succeeds and <code>Value</code> is trimmed.</td><td class="trace">Spec §03</td></tr>
+    <tr><td class="tc">TC-W02</td><td class="gwt"><b>Given</b> <code>""</code>, <code>"   "</code>, a 201-character string <b>When</b> a <code>WorkItemName</code> is created <b>Then</b> it throws <code>DomainException</code> with the matching message from §02.</td><td class="trace">Spec §03, §06</td></tr>
+    <tr><td class="tc">TC-W03</td><td class="gwt"><b>Given</b> a valid name and <code>Guid.Empty</code> <b>When</b> <code>WorkItem.Create</code> is called <b>Then</b> it throws <code>DomainException</code> <code>"Assignee id is required."</code></td><td class="trace">Spec §03</td></tr>
+    <tr><td class="tc">TC-W04</td><td class="gwt"><b>Given</b> <code>IUsersApi</code> says the user does not exist <b>When</b> <code>CreateWorkItemHandler</code> runs <b>Then</b> it throws <code>BusinessRuleViolationException</code> <code>"User '{id}' does not exist."</code> and nothing is saved.</td><td class="trace">Spec §05, Q1</td></tr>
+    <tr><td class="tc">TC-W05</td><td class="gwt"><b>Given</b> <code>IUsersApi</code> says the user exists <b>When</b> the handler runs <b>Then</b> it returns a <code>WorkItemResponse</code> with a new id, the trimmed name and the assignee id, and the item is saved.</td><td class="trace">Spec §05</td></tr>
+    <tr><td class="tc">TC-W06</td><td class="gwt"><b>Given</b> 2 items for user A and 1 for user B <b>When</b> <code>ListWorkItemsByAssigneeHandler</code> runs for A, then for an unknown id <b>Then</b> it returns exactly A's 2 items, then an empty list.</td><td class="trace">Spec §04</td></tr>
+  </table></div>
+</section>
+
+<!-- 5 -->
+<section id="api">
+  <h2><span class="num">05</span>API over HTTP <span class="badge api">Integration</span></h2>
+  <p><code>WorkTracker.Api.Tests</code> with <code>WebApplicationFactory&lt;Program&gt;</code>. Every POST sends a fresh <code>Idempotency-Key</code>. Each test creates its own users with unique names, so tests don't depend on each other. Error cases also check that the body is ProblemDetails with the §02 message in <code>detail</code>.</p>
+  <div class="table-wrap"><table>
+    <tr><th>ID</th><th>Given / When / Then</th><th>Traces to</th></tr>
+    <tr><td class="tc">TC-A01</td><td class="gwt"><b>When</b> <code>POST /users {"username":"alice"}</code> <b>Then</b> 201, body <code>{ id, username }</code>, and <code>Location: /users/{id}</code>.</td><td class="trace">Spec §04</td></tr>
+    <tr><td class="tc">TC-A02</td><td class="gwt"><b>Given</b> a created user <b>When</b> <code>GET</code> the <code>Location</code> URL <b>Then</b> 200 with the same <code>{ id, username }</code>.</td><td class="trace">Spec §04</td></tr>
+    <tr><td class="tc">TC-A03</td><td class="gwt"><b>When</b> <code>GET /users/{random guid}</code> <b>Then</b> 404 ProblemDetails <code>"User '{id}' was not found."</code></td><td class="trace">Spec §06</td></tr>
+    <tr><td class="tc">TC-A04</td><td class="gwt"><b>When</b> <code>POST /users {"username":"a"}</code> <b>Then</b> 400 ProblemDetails with the length message.</td><td class="trace">Spec §06</td></tr>
+    <tr><td class="tc">TC-A05</td><td class="gwt"><b>Given</b> <code>"alice"</code> exists <b>When</b> <code>POST /users {"username":"Alice"}</code> with a new key <b>Then</b> 409 ProblemDetails <code>"Username 'Alice' already exists."</code></td><td class="trace">Spec §06, Q6</td></tr>
+    <tr><td class="tc">TC-A06</td><td class="gwt"><b>Given</b> a created user <b>When</b> <code>POST /work-items {name, assigneeId}</code> <b>Then</b> 201, body <code>{ id, name, assigneeId }</code>, no <code>Location</code> header.</td><td class="trace">Spec §04</td></tr>
+    <tr><td class="tc">TC-A07</td><td class="gwt"><b>When</b> <code>POST /work-items</code> with a random <code>assigneeId</code> <b>Then</b> 422 ProblemDetails <code>"User '{id}' does not exist."</code></td><td class="trace">Spec §06, Q1</td></tr>
+    <tr><td class="tc">TC-A08</td><td class="gwt"><b>Given</b> 2 items for user A and 1 for user B <b>When</b> <code>GET /work-items?assigneeId={A}</code>, then with a random id <b>Then</b> 200 with exactly A's 2 items, then 200 <code>[]</code>.</td><td class="trace">Spec §04</td></tr>
+    <tr><td class="tc">TC-A09</td><td class="gwt"><b>When</b> <code>GET /work-items</code> with no <code>assigneeId</code>, or with <code>assigneeId=not-a-guid</code> <b>Then</b> 400 ProblemDetails.</td><td class="trace">Spec §04, §05</td></tr>
+  </table></div>
+</section>
+
+<!-- 6 -->
+<section id="idempotency">
+  <h2><span class="num">06</span>Idempotency <span class="badge api">Integration</span></h2>
+  <p>TC-I01 to TC-I04 go over HTTP. TC-I05 and TC-I06 test <code>IdempotencyStore</code> directly with a <code>FakeTimeProvider</code>, because "in progress" and "10 seconds later" can't be produced reliably over HTTP.</p>
+  <div class="table-wrap"><table>
+    <tr><th>ID</th><th>Given / When / Then</th><th>Traces to</th></tr>
+    <tr><td class="tc">TC-I01</td><td class="gwt"><b>When</b> <code>POST /users</code> and <code>POST /work-items</code> are sent without the header, or with an empty one <b>Then</b> 400 <code>"Idempotency-Key header is required."</code> and nothing is created.</td><td class="trace">Spec §08, Q9</td></tr>
+    <tr><td class="tc">TC-I02</td><td class="gwt"><b>Given</b> <code>POST /work-items</code> with key K returned 201 <b>When</b> the same request is sent again with K <b>Then</b> the status, body and headers are the same, the reply has <code>Idempotent-Replayed: true</code>, and <code>GET /work-items?assigneeId=</code> shows 1 item, not 2.</td><td class="trace">Spec §08, Q9</td></tr>
+    <tr><td class="tc">TC-I03</td><td class="gwt"><b>Given</b> <code>POST /users</code> with key K returned 201 <b>When</b> K is sent with a different body, or to <code>POST /work-items</code> <b>Then</b> 422 <code>"Idempotency-Key was already used with a different request."</code></td><td class="trace">Spec §08</td></tr>
+    <tr><td class="tc">TC-I04</td><td class="gwt"><b>Given</b> <code>POST /users {"username":"a"}</code> with key K returned 400 <b>When</b> K is sent again with a valid username <b>Then</b> 201: a failed request releases its key.</td><td class="trace">Spec §08, Q10</td></tr>
+    <tr><td class="tc">TC-I05</td><td class="gwt"><b>Given</b> key K is reserved and not completed <b>When</b> K is reserved again <b>Then</b> the store answers "in progress", which the pre-processor turns into 409.</td><td class="trace">Spec §08</td></tr>
+    <tr><td class="tc">TC-I06</td><td class="gwt"><b>Given</b> key K completed at time T, with a 10-second window <b>When</b> K is reserved at T + 9s, then at T + 11s <b>Then</b> the first returns the stored response, the second is a new reservation, and expired keys are no longer stored.</td><td class="trace">Spec §08, Q10</td></tr>
+  </table></div>
+</section>
+
+<!-- 7 -->
+<section id="uat">
+  <h2><span class="num">07</span>Manual UAT <span class="badge manual">Human gate</span></h2>
+  <p>The candidate runs these against the live service (<code>dotnet run</code>) from <code>requests.http</code>, after all automated tests pass. Work is done only when every row passes. These check intent: that the API reads and behaves the way a client expects, not only that the code matches the tests.</p>
+  <div class="table-wrap"><table>
+    <tr><th>ID</th><th>Step</th><th>Expect</th></tr>
+    <tr><td class="tc">UAT-01</td><td>Run the app and open Swagger UI.</td><td>The 4 endpoints are listed and readable.</td></tr>
+    <tr><td class="tc">UAT-02</td><td>Create user <code>alice</code>, then open the <code>Location</code> URL.</td><td>201, then 200 with the same user.</td></tr>
+    <tr><td class="tc">UAT-03</td><td>Create user <code>ALICE</code>.</td><td>409 with a message a person can understand.</td></tr>
+    <tr><td class="tc">UAT-04</td><td>Create users <code>a</code> and <code>al!ce</code>.</td><td>400 each, with the message naming the broken rule.</td></tr>
+    <tr><td class="tc">UAT-05</td><td>Create 2 work items for alice, then list them.</td><td>201 each; the list holds both.</td></tr>
+    <tr><td class="tc">UAT-06</td><td>Create a work item for a random GUID.</td><td>422, user does not exist.</td></tr>
+    <tr><td class="tc">UAT-07</td><td>Send the same create-work-item request twice quickly with the same key.</td><td>Second reply has <code>Idempotent-Replayed: true</code>; the list grows by 1.</td></tr>
+    <tr><td class="tc">UAT-08</td><td>Wait more than 10 seconds and send it again with the same key.</td><td>A new item is created (the documented trade-off).</td></tr>
+    <tr><td class="tc">UAT-09</td><td>Send a POST without <code>Idempotency-Key</code>.</td><td>400, header is required.</td></tr>
+    <tr><td class="tc">UAT-10</td><td>Send malformed JSON, and <code>GET /users/not-a-guid</code>.</td><td>400 or 404 in ProblemDetails form, never a stack trace.</td></tr>
+  </table></div>
+</section>
+
+<!-- 8 -->
+<section id="out">
+  <h2><span class="num">08</span>Not tested, on purpose</h2>
+  <ul>
+    <li><strong>The generic 500 path.</strong> It would need a test-only endpoint that throws. UAT-10 checks that no internals leak.</li>
+    <li><strong>Swagger output.</strong> Checked by eye in UAT-01.</li>
+    <li><strong>Endpoint-to-command mapping in isolation.</strong> Endpoints are one line; the integration tests cover them.</li>
+    <li><strong>Load and performance.</strong> Out of scope for an in-memory take-home.</li>
+    <li><strong>Concurrent idempotent requests over HTTP.</strong> The atomic reservation is proven at store level (TC-I05) instead.</li>
+  </ul>
+  <div class="callout">
+    <div class="callout-title">Approval</div>
+    <p>Pending. The candidate's verdict and any changes go into <a href="../decisions.html">decisions.html</a> as the next question.</p>
+  </div>
+</section>
+
+<footer class="doc-footer">WorkTracker test plan · Built from the <a href="2026-10-08-work-tracker-design.html">design spec</a></footer>
+</main>
+</body>
+</html>
