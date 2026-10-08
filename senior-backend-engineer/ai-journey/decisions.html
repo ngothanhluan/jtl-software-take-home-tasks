@@ -20,7 +20,7 @@
 </header>
 
 <div class="stats">
-  <div class="stat"><div class="value">20</div><div class="label">decisions</div></div>
+  <div class="stat"><div class="value">21</div><div class="label">decisions</div></div>
   <div class="stat"><div class="value" style="color:var(--red)">5</div><div class="label">candidate overrode the AI</div></div>
   <div class="stat"><div class="value" style="color:var(--amber)">3</div><div class="label">candidate pushed back</div></div>
   <div class="stat"><div class="value" style="color:var(--violet)">2</div><div class="label">candidate caught an AI mistake</div></div>
@@ -32,7 +32,7 @@
   <span class="badge pushback">Candidate pushed back</span>
   <span class="badge corrected">Candidate corrected AI</span>
 </div>
-<p style="color:var(--muted);font-size:14px;margin-bottom:28px">Model note: Opus 5.5 for Q1–Q11, Fable 5.1 for Q12–Q19 (the written spec review), then Opus 5.5 again from Q20. The candidate switched models with <code>/model</code> each time.</p>
+<p style="color:var(--muted);font-size:14px;margin-bottom:28px">Model note: Opus 5.5 for Q1–Q11, Fable 5.1 for Q12–Q19 (the written spec review), then Opus 5.5 again from Q20 onward. The candidate switched models with <code>/model</code> each time.</p>
 
 <h2 style="margin:8px 0 14px">Phase 1 · Brainstorming</h2>
 
@@ -354,6 +354,21 @@
       <q>no, just remove the .omc. and I think for better visual, can you make those docs to be in html, let says beutify it. that's my rules for this project as we need better visual to read and understand. the decisions logs should be formatted as question and anwser. it's easy to read. when everything is done, then I will compact the session and we can start the implementation plan.</q></div>
     <div class="qa-label">Outcome</div>
     <div class="outcome">Every planning doc is now HTML sharing one stylesheet (<code>assets/style.css</code>). The decision log is in question-and-answer form. <code>.omc/</code> was deleted. The repository <code>README.md</code> stays Markdown so GitHub renders it.</div>
+  </div>
+</section>
+
+<!-- Q21 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q21 · Is the test plan ready to build against?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Drafted <a href="plan/test-plan.html">test-plan.html</a>: 26 automated cases (Users, WorkItems, HTTP, idempotency) and 10 manual UAT steps, with the exact error messages fixed in the plan. Asked the candidate to check the wording, whether 26 cases was too many for "a few illustrative tests" (suggested cuts: TC-U05, TC-I05/I06), and testing the idempotency store directly for "in progress" and window expiry.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>approved</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Test plan approved as drafted, all 26 cases kept. The exact messages in its section 02 are now the contract the tests assert. Next: the implementation plan.</div>
   </div>
 </section>
 
