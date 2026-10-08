@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{EAC34A52
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkTracker.Users.Tests", "tests\WorkTracker.Users.Tests\WorkTracker.Users.Tests.csproj", "{1E2CA8F7-30F9-41C9-B61D-344BBD47A776}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkTracker.Users.Contracts", "src\Modules\Users\WorkTracker.Users.Contracts\WorkTracker.Users.Contracts.csproj", "{9FE7513E-5301-4A4B-8586-4263E622A942}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,6 +40,10 @@ Global
 		{1E2CA8F7-30F9-41C9-B61D-344BBD47A776}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1E2CA8F7-30F9-41C9-B61D-344BBD47A776}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1E2CA8F7-30F9-41C9-B61D-344BBD47A776}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FE7513E-5301-4A4B-8586-4263E622A942}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FE7513E-5301-4A4B-8586-4263E622A942}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FE7513E-5301-4A4B-8586-4263E622A942}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FE7513E-5301-4A4B-8586-4263E622A942}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{54A65ED4-F167-4DB8-BBD7-C848E26F49F7} = {3890EAA0-D1C9-44F3-BE9C-55E6F7BAAFC7}
@@ -45,5 +51,6 @@ Global
 		{811A89A3-397B-4DE1-8D2E-C2D06BD7C4D6} = {C07196F7-DCEB-4011-A2D5-CE79C4CF17B1}
 		{85EB3B55-0610-4A3A-8037-12130567405C} = {811A89A3-397B-4DE1-8D2E-C2D06BD7C4D6}
 		{1E2CA8F7-30F9-41C9-B61D-344BBD47A776} = {EAC34A52-C880-4352-9D0B-5E818FB03819}
+		{9FE7513E-5301-4A4B-8586-4263E622A942} = {811A89A3-397B-4DE1-8D2E-C2D06BD7C4D6}
 	EndGlobalSection
 EndGlobal

@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../../WorkTracker.Shared/WorkTracker.Shared.csproj" />
+    <ProjectReference Include="../WorkTracker.Users.Contracts/WorkTracker.Users.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
