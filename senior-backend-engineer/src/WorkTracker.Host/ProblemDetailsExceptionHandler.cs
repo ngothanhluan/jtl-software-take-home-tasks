@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using WorkTracker.Shared;
 
 namespace WorkTracker.Host;
 
 // Turns the Shared exceptions into RFC 9457 problem details with the rule's own message.
 // Anything else is a generic 500 that exposes nothing internal.
-internal sealed class ProblemDetailsExceptionHandler(IProblemDetailsService problemDetails) : IExceptionHandler
+// TypedResults.Problem always writes the body, whatever the client's Accept header says.
+internal sealed class ProblemDetailsExceptionHandler : IExceptionHandler
 {
-    public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken ct)
+    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken ct)
     {
         var (status, detail) = exception switch
         {
@@ -18,11 +18,7 @@ internal sealed class ProblemDetailsExceptionHandler(IProblemDetailsService prob
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred.")
         };
 
-        httpContext.Response.StatusCode = status;
-        return problemDetails.TryWriteAsync(new ProblemDetailsContext
-        {
-            HttpContext = httpContext,
-            ProblemDetails = new ProblemDetails { Status = status, Detail = detail }
-        });
+        await TypedResults.Problem(detail: detail, statusCode: status).ExecuteAsync(httpContext);
+        return true;
     }
 }

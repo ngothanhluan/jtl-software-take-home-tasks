@@ -56,6 +56,18 @@ public class UsersEndpointsTests(WebApplicationFactory<Program> factory) : IClas
     }
 
     [Fact]
+    public async Task TC_A04_Invalid_username_returns_problem_body_even_when_client_does_not_ask_for_json()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/users") { Content = JsonContent.Create(new { username = "a" }) };
+        request.Headers.Add(KeyHeader, Guid.NewGuid().ToString());
+        request.Headers.Add("Accept", "text/html");
+
+        var problem = await (await _client.SendAsync(request)).ShouldBeProblemAsync(HttpStatusCode.BadRequest);
+
+        problem.Detail.ShouldBe("Username must be between 3 and 32 characters.");
+    }
+
+    [Fact]
     public async Task TC_A04_Malformed_json_returns_400_problem_not_500()
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/users")
