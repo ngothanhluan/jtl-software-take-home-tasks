@@ -1,0 +1,102 @@
+### WorkTracker: every call, the error cases, and the manual UAT checklist at the bottom.
+### Start the app first:  dotnet run --project src/WorkTracker.Host
+@baseUrl = http://localhost:5080
+
+### 1. Create a user -> 201 + Location
+# @name createUser
+POST {{baseUrl}}/users
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "username": "alice" }
+
+### 2. Get that user -> 200
+GET {{baseUrl}}/users/{{createUser.response.body.$.id}}
+
+### 3. Unknown user -> 404
+GET {{baseUrl}}/users/7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+### 4. Same username, different case -> 409
+POST {{baseUrl}}/users
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "username": "ALICE" }
+
+### 5a. Too short -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "username": "a" }
+
+### 5b. Bad characters -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "username": "al!ce" }
+
+### 6. Create a work item for alice -> 201
+POST {{baseUrl}}/work-items
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "name": "Write README", "assigneeId": "{{createUser.response.body.$.id}}" }
+
+### 7. Unknown assignee -> 422
+POST {{baseUrl}}/work-items
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "name": "Write README", "assigneeId": "7c9e6679-7425-40de-944b-e07fc1f90ae7" }
+
+### 8. List alice's work items -> 200
+GET {{baseUrl}}/work-items?assigneeId={{createUser.response.body.$.id}}
+
+### 9a. List without assigneeId -> 400
+GET {{baseUrl}}/work-items
+
+### 9b. List with an invalid assigneeId -> 400
+GET {{baseUrl}}/work-items?assigneeId=not-a-guid
+
+### 10. Double click: send this twice -> the second reply has Idempotent-Replayed: true
+POST {{baseUrl}}/work-items
+Content-Type: application/json
+Idempotency-Key: double-click-demo
+
+{ "name": "Clicked twice", "assigneeId": "{{createUser.response.body.$.id}}" }
+
+### 11. Same key, different body -> 422
+POST {{baseUrl}}/work-items
+Content-Type: application/json
+Idempotency-Key: double-click-demo
+
+{ "name": "Something else", "assigneeId": "{{createUser.response.body.$.id}}" }
+
+### 12. No Idempotency-Key -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{ "username": "bob" }
+
+### 13. Malformed JSON -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ not json
+
+###
+# MANUAL UAT CHECKLIST (the human gate; see ai-journey/plan/test-plan.html section 07)
+# Restart the app before starting so the data is empty.
+# [ ] UAT-01  Open http://localhost:5080/swagger: the 4 endpoints are listed and readable.
+# [ ] UAT-02  Run 1, then 2: 201 with a Location header, then 200 with the same user.
+# [ ] UAT-03  Run 4: 409, "Username 'ALICE' already exists."
+# [ ] UAT-04  Run 5a and 5b: 400 each, the message names the broken rule.
+# [ ] UAT-05  Run 6 twice, then 8: 201 each; the list holds both.
+# [ ] UAT-06  Run 7: 422, "User '...' does not exist."
+# [ ] UAT-07  Run 10 twice quickly: the second reply has Idempotent-Replayed: true; 8 grows by 1.
+# [ ] UAT-08  Wait more than 10 seconds, run 10 again: a new item is created (documented trade-off).
+# [ ] UAT-09  Run 12: 400, "Idempotency-Key header is required."
+# [ ] UAT-10  Run 13 and GET /users/not-a-guid: 400 or 404 problem details, never a stack trace.
