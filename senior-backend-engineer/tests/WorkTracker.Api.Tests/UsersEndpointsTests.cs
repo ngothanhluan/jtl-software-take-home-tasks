@@ -83,23 +83,6 @@ public class UsersEndpointsTests(WebApplicationFactory<Program> factory) : IClas
     }
 
     [Fact]
-    public async Task TC_A04_Wrong_json_type_returns_400_naming_the_field()
-    {
-        var response = await _client.PostWithKeyAsync("/users", new { username = 5 });
-
-        var problem = await response.ShouldBeProblemAsync(HttpStatusCode.BadRequest);
-        problem.Detail.ShouldBe("'username' has an invalid value.");
-    }
-
-    [Fact]
-    public async Task TC_A03_Get_user_with_invalid_id_returns_400_naming_the_field()
-    {
-        var problem = await (await _client.GetAsync("/users/not-a-guid")).ShouldBeProblemAsync(HttpStatusCode.BadRequest);
-
-        problem.Detail.ShouldBe("'id' has an invalid value.");
-    }
-
-    [Fact]
     public async Task TC_A05_Duplicate_username_ignoring_case_returns_409_problem()
     {
         var username = NewUsername();

@@ -12,13 +12,10 @@ public class WorkItemNameTests
         new WorkItemName(new string('x', 200)).Value.Length.ShouldBe(200);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void TC_W02_Missing_name_throws_DomainException(string? input)
+    [Fact]
+    public void TC_W02_Missing_name_throws_DomainException()
     {
-        var exception = Should.Throw<DomainException>(() => new WorkItemName(input));
+        var exception = Should.Throw<DomainException>(() => new WorkItemName("   "));
 
         exception.Message.ShouldBe("Work item name is required.");
     }

@@ -87,6 +87,9 @@ Idempotency-Key: {{$guid}}
 
 { not json
 
+### 14. Id that is not a GUID -> 400 "'id' has an invalid value."
+GET {{baseUrl}}/users/not-a-guid
+
 ###
 # MANUAL UAT CHECKLIST (the human gate; see ai-journey/plan/test-plan.html section 07)
 # Restart the app before starting so the data is empty.
@@ -99,4 +102,5 @@ Idempotency-Key: {{$guid}}
 # [ ] UAT-07  Run 10 twice quickly: the second reply has Idempotent-Replayed: true; 8 grows by 1.
 # [ ] UAT-08  Wait more than 10 seconds, run 10 again: a new item is created (documented trade-off).
 # [ ] UAT-09  Run 12: 400, "Idempotency-Key header is required."
-# [ ] UAT-10  Run 13 and GET /users/not-a-guid: 400 or 404 problem details, never a stack trace.
+# [ ] UAT-10  Run 13 and 14: 400 each, "The request body is not valid JSON." and "'id' has an invalid value.";
+#              only type, title, status and detail in the body: no stack trace, no parser text.

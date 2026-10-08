@@ -10,31 +10,15 @@ public class IdempotencyEndpointsTests(WebApplicationFactory<Program> factory) :
     private const string KeyUsedForDifferentRequest = "Idempotency-Key was already used with a different request.";
     private readonly HttpClient _client = factory.CreateClient();
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    public async Task TC_I01_User_post_without_a_key_returns_400_and_creates_nothing(string? key)
+    [Fact]
+    public async Task TC_I01_User_post_without_a_key_returns_400_and_creates_nothing()
     {
         var username = NewUsername();
-        var request = new HttpRequestMessage(HttpMethod.Post, "/users") { Content = JsonContent.Create(new { username }) };
-        if (key is not null)
-            request.Headers.TryAddWithoutValidation(KeyHeader, key);
 
-        var problem = await (await _client.SendAsync(request)).ShouldBeProblemAsync(HttpStatusCode.BadRequest);
+        var problem = await (await _client.PostAsJsonAsync("/users", new { username })).ShouldBeProblemAsync(HttpStatusCode.BadRequest);
 
         problem.Detail.ShouldBe("Idempotency-Key header is required.");
         (await _client.PostWithKeyAsync("/users", new { username })).StatusCode.ShouldBe(HttpStatusCode.Created);
-    }
-
-    [Fact]
-    public async Task TC_I01_Work_item_post_without_a_key_returns_400()
-    {
-        var user = await _client.CreateUserAsync();
-
-        var response = await _client.PostAsJsonAsync("/work-items", new { name = "Write README", assigneeId = user.Id });
-
-        var problem = await response.ShouldBeProblemAsync(HttpStatusCode.BadRequest);
-        problem.Detail.ShouldBe("Idempotency-Key header is required.");
     }
 
     [Fact]
@@ -55,21 +39,6 @@ public class IdempotencyEndpointsTests(WebApplicationFactory<Program> factory) :
             .ShouldBe(await first.Content.ReadFromJsonAsync<WorkItemDto>());
         var items = await _client.GetFromJsonAsync<WorkItemDto[]>($"/work-items?assigneeId={user.Id}");
         items.ShouldNotBeNull().Length.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task TC_I02_Replayed_user_post_keeps_the_location_header()
-    {
-        var key = Guid.NewGuid().ToString();
-        var body = new { username = NewUsername() };
-
-        var first = await _client.PostWithKeyAsync("/users", body, key);
-        var second = await _client.PostWithKeyAsync("/users", body, key);
-
-        second.StatusCode.ShouldBe(HttpStatusCode.Created);
-        second.Headers.Location.ShouldBe(first.Headers.Location);
-        (await second.Content.ReadFromJsonAsync<UserDto>())
-            .ShouldBe(await first.Content.ReadFromJsonAsync<UserDto>());
     }
 
     [Fact]

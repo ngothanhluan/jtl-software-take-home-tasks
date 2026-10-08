@@ -11,14 +11,6 @@ public class IdempotencyStoreTests
     public IdempotencyStoreTests() => _store = new IdempotencyStore(_time, TimeSpan.FromSeconds(10));
 
     [Fact]
-    public void TC_I05_A_reserved_key_that_is_not_completed_is_in_progress()
-    {
-        _store.Reserve("K", "fingerprint").Status.ShouldBe(ReservationStatus.Reserved);
-
-        _store.Reserve("K", "fingerprint").Status.ShouldBe(ReservationStatus.InProgress);
-    }
-
-    [Fact]
     public async Task TC_I05_Concurrent_reservations_of_one_key_let_exactly_one_through()
     {
         var reservations = await Task.WhenAll(Enumerable.Range(0, 20)

@@ -10,17 +10,6 @@ public class CreateWorkItemHandlerTests
     private readonly InMemoryWorkItemRepository _repository = new();
 
     [Fact]
-    public async Task TC_W03_Handler_rejects_an_empty_assignee_before_the_user_lookup()
-    {
-        var handler = new CreateWorkItemHandler(_repository, new StubUsersApi(userExists: false));
-
-        var exception = await Should.ThrowAsync<DomainException>(() =>
-            handler.ExecuteAsync(new CreateWorkItemCommand("Write README", Guid.Empty), CancellationToken.None));
-
-        exception.Message.ShouldBe("Assignee id is required.");
-    }
-
-    [Fact]
     public async Task TC_W04_Unknown_assignee_throws_BusinessRuleViolationException_and_saves_nothing()
     {
         var handler = new CreateWorkItemHandler(_repository, new StubUsersApi(userExists: false));

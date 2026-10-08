@@ -4,7 +4,7 @@ using WorkTracker.WorkItems.Infrastructure;
 
 namespace WorkTracker.WorkItems;
 
-// The module's only public entry point. It expects IUsersApi to be registered by the host.
+// The module's only public entry point. It needs an IUsersApi registration (AddUsersModule provides it).
 public static class WorkItemsModule
 {
     public static IServiceCollection AddWorkItemsModule(this IServiceCollection services) =>
