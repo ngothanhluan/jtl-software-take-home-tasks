@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Log</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="page">
+
+<header class="doc-header">
+  <div class="eyebrow">AI journey · Raw decision log</div>
+  <h1>How the design was decided</h1>
+  <p class="lede">Every design question in order: what the AI asked or proposed, the candidate's answer quoted exactly as typed (typos included), and the outcome. Nothing is polished. The full session is in <code>transcript.md</code>.</p>
+  <div class="meta">
+    <span class="chip">Date <strong>2026-10-08</strong></span>
+    <span class="chip">Spec <a href="plan/2026-10-08-work-tracker-design.html"><strong>design spec</strong></a></span>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat"><div class="value">20</div><div class="label">decisions</div></div>
+  <div class="stat"><div class="value" style="color:var(--red)">5</div><div class="label">candidate overrode the AI</div></div>
+  <div class="stat"><div class="value" style="color:var(--amber)">3</div><div class="label">candidate pushed back</div></div>
+  <div class="stat"><div class="value" style="color:var(--violet)">2</div><div class="label">candidate caught an AI mistake</div></div>
+</div>
+
+<div class="legend">
+  <span class="badge agreed">Agreed with AI</span>
+  <span class="badge overrode">Candidate overrode AI</span>
+  <span class="badge pushback">Candidate pushed back</span>
+  <span class="badge corrected">Candidate corrected AI</span>
+</div>
+<p style="color:var(--muted);font-size:14px;margin-bottom:28px">Model note: Opus 5.5 for Q1–Q11, Fable 5.1 for Q12–Q19 (the written spec review), then Opus 5.5 again from Q20. The candidate switched models with <code>/model</code> each time.</p>
+
+<h2 style="margin:8px 0 14px">Phase 1 · Brainstorming</h2>
+
+<!-- Q1 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q1 · Must the assignee of a work item be an existing user?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Three options: <strong>(A)</strong> check synchronously through a public Users contract, <strong>(B)</strong> eventual consistency through a <code>UserCreated</code> event and a local copy, <strong>(C)</strong> no check. Recommended A, with B in the README as the evolution path.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>I think A, but which architecture we're following? clean architecture or vertical slice? remember simple is the best, easy to read, easy to maintenance</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">A. "Simple is the best" became the guiding principle for every later choice.</div>
+  </div>
+</section>
+
+<!-- Q2 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q2 · Clean Architecture or vertical slices?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Recommended vertical slices inside each module, with a <code>Domain/</code> folder for DDD and a <code>Users.Contracts</code> project as the only cross-module reference. Rejected Clean Architecture because it would mean about 8 projects for 4 endpoints.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div><q>I think this structure is good to go</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Vertical slices per module.</div>
+  </div>
+</section>
+
+<!-- Q3 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q3 · Which CQRS library?</h2><span class="badge overrode">Candidate overrode AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Recommended small hand-written <code>ICommand</code>/<code>IQuery</code> interfaces with no library. Alternatives: the FastEndpoints command bus ("queries become commands, so the split blurs"), MediatR (went commercial), and Mediator (source-generated).</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>as Mediatr goes commercial I think I will go with fastendpoint. as CQRS pattern is how we control, use it, not just because its name. the implementation class can be name *Query while implemting the ICommand interface. I think it does not matter</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">FastEndpoints command bus. The split is kept by naming (<code>*Command</code> / <code>*Query</code>) and by how the classes are used, not by interface type.</div>
+  </div>
+</section>
+
+<!-- Q4 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q4 · Which persistence?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Recommended plain in-memory repositories (<code>ConcurrentDictionary</code>) behind repository interfaces, rather than EF Core InMemory or SQLite.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div><q>we no doubt, A, in-memory should be good option for a test repo.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">In-memory repositories, one store per module.</div>
+  </div>
+</section>
+
+<!-- Q5 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q5 · How should errors flow?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Recommended exceptions for broken rules, mapped to ProblemDetails in one central handler, and <code>null</code> for not found. Alternatives: a <code>Result&lt;T&gt;</code> type, or the ErrorOr / FluentResults libraries.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div><q>A, keep it simple</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Exceptions plus central ProblemDetails mapping.</div>
+  </div>
+</section>
+
+<!-- Q6 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q6 · Do error responses carry a specific message?</h2><span class="badge pushback">Candidate pushed back</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Presented the domain model and API (Section 1) and asked for approval.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>agree on option1. Also just want to push back the error handling. is that error return with specific error message? I expect that it would be something "Username is already existed" when checking username uniqueness</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Confirmed that every error carries a specific message in the ProblemDetails <code>detail</code> field, and showed example bodies for 400, 404, 409 and 422.</p></div>
+    <div class="bubble human"><div class="who">Candidate</div><q>agree, lets go next</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Specific, readable messages became an explicit requirement, e.g. <code>"Username 'alice' already exists."</code></div>
+  </div>
+</section>
+
+<!-- Q7 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q7 · Where is validation, and what about concurrency?</h2><span class="badge corrected">Candidate corrected AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Presented the request flow and module wiring (Section 2) and asked for approval.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>it looks right, but I just want to follow up with some questions, there is the validation? also we should handle the concurrency issue with adding/updating data.</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Explained the three validation layers. Admitted that the username check followed by a separate add was a race: two requests at once could both pass. Changed it to an atomic <code>TryAddAsync</code>.</p></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">The candidate's question exposed a real race in the AI's design. Username uniqueness is now enforced atomically.</div>
+  </div>
+</section>
+
+<!-- Q8 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q8 · Build update concurrency now?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>No update use cases exist. Recommended documenting optimistic concurrency (a version number, then ETag and If-Match) rather than building it.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div><q>no, the requirement does not mention it. but should we handle idempotency, when somehow user double click? and create 2 same workitem?</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Documented in the README, not built. The candidate raised idempotency as a new topic (Q9).</div>
+  </div>
+</section>
+
+<!-- Q9 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q9 · Should double submissions be prevented?</h2><span class="badge overrode">Candidate overrode AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Recommended documenting an <code>Idempotency-Key</code> header rather than building it, for the same reason as Q8: the brief doesn't ask for it.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>how about idempotency check for a certain window? like 10s? because there is very low chance of a human create 2 identical workitem on purpose in 5-10s.</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Read this as deduplicating by content (same name and assignee) and argued against it: it brings the race back, and the rule would sit in the wrong layer.</p></div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>no I mean we still need idempotency key require from the client and use that key for 10s window. how that sound?</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Designed it: the key is required on both POSTs, the window is 10 seconds and configurable, the original response is replayed, keys are reserved atomically, and it all lives in the Host.</p></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Built. The candidate overrode "document only" and supplied the design (client key plus a short server-side window), which avoids the problems the AI raised.</div>
+  </div>
+</section>
+
+<!-- Q10 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q10 · Does a retry use a new key?</h2><span class="badge corrected">Candidate corrected AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Described the trade-off of a 10-second window in a way that read as if a retry would use a new key.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>oh, good to know that trade off. but retrying should not change the idempotency key, I think. other stuffs are good for me.</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Agreed: retries reuse the key, and the real limit is that the server forgets keys after 10 seconds. Also corrected its own earlier claim that the store stays small. Most keys are never reused, so expired keys are now removed on every reservation.</p></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Wording fixed, plus an AI self-correction: expired keys are purged so memory stays bounded.</div>
+  </div>
+</section>
+
+<!-- Q11 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q11 · Testing and deliverables (Section 3)</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Proposed three test projects (two module test projects and one API test project), the README, <code>requests.http</code>, and the <code>ai-journey/</code> contents. Asked the candidate to write <code>judgment.md</code> in their own words.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>I think the section 3 looks good for the tests. for the judgment, I think it's all good from my feedback. just extracting from the conversation. there will me more during doing code review as well.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Approved. The judgment notes are taken from this log and extended during code review.</div>
+  </div>
+</section>
+
+<h2 style="margin:32px 0 14px">Phase 2 · Written spec review</h2>
+
+<!-- Q12 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q12 · Why make module types <code>internal</code>?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>hrm, I don't think we should use internal here. as we only have 1 project. internal should be same as public. Ah I see now, we need it internal as Test project should only ref to the Contracts, right?</q></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Not quite. The project references are what keep the two modules apart. <code>internal</code> protects against the projects that <em>do</em> reference a module (the Host and tests), so <code>Program.cs</code> can't build repositories or aggregates directly. It's also the C# default, so it costs nothing.</p></div>
+    <div class="bubble human"><div class="who">Candidate</div><q>agree.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Kept <code>internal</code>; the reasoning was added to the spec.</div>
+  </div>
+</section>
+
+<!-- Q13 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q13 · "SharedKernel" or "Shared"?</h2><span class="badge overrode">Candidate overrode AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>I don't think the name SharedKernel is too formal, why not just Shared? make it simple.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Renamed to <code>WorkTracker.Shared</code>.</div>
+  </div>
+</section>
+
+<!-- Q14 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q14 · Guid or int/long IDs?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>Well, for sql database, I prefer int or long, but it's acceptable for GUID as we're using in-memory data storage.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome"><code>Guid</code> kept for in-memory storage. The candidate's preference for <code>int</code>/<code>long</code> with SQL is recorded in the spec and README.</div>
+  </div>
+</section>
+
+<!-- Q15 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q15 · Are value objects overcomplicating this?</h2><span class="badge pushback">Candidate pushed back</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>Tell me why we need value object here? any tradeoff, why not just POCO? looks like we over complicated? if so explain why?</q></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>The brief explicitly grades value objects and invariants. Offered <strong>(A)</strong> value objects everywhere, including strongly-typed IDs, or <strong>(B)</strong> value objects only where a rule lives, with plain <code>Guid</code> IDs. Recommended B.</p></div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>well I think that's a good catch for option B, by let says how this is adaptable for different database? like sql or no sql with ef core? like I kinda cannot imagine what it looks like for sql database with ef core. what columns looks like?</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Showed the EF Core mapping: a value object becomes one column through <code>HasConversion</code>, with a unique index on <code>Username</code> and no foreign key between the module schemas.</p></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Option B: only <code>Username</code> and <code>WorkItemName</code> are value objects, and four types were dropped. A "persistence portability" section was added to the spec.</div>
+  </div>
+</section>
+
+<!-- Q16 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q16 · "DomainException" or "ApiException"?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>I prefer the name ApiException. there is any meaning of using the name DomainException?</q></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>The name says where the rule broke, not who handles it. The domain shouldn't describe itself in API terms.</p></div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>agree, then for what exception comming from other places/ business it should be different name, you says?</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Yes, each exception is named for the kind of failure: <code>DomainException</code> (400), <code>ConflictException</code> (409), <code>BusinessRuleViolationException</code> (422).</p></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Kept the three names; the naming rule was added to the spec.</div>
+  </div>
+</section>
+
+<!-- Q17 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q17 · What should replace FluentAssertions?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>Hrm, there is any alternatives fror FluentAssertion? please research. and provide 2-3 best options with your recommendation. and explain why you choose it.</q></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Checked the NuGet API and the web. Options: Shouldly 4.3.0 (BSD-3, actively maintained), AwesomeAssertions 9.6.0 (Apache-2.0, but keeps the <code>FluentAssertions</code> namespace), and plain xUnit <code>Assert</code>. Recommended Shouldly.</p></div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>agree with shouldy. this is just testing package. we will go with whatever popular and prod ready.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Shouldly 4.3.0.</div>
+  </div>
+</section>
+
+<!-- Q18 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q18 · Polished decision table or raw log?</h2><span class="badge overrode">Candidate overrode AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>Instead of this beautified decision log. can we make it raw, because I think the interviewer would like to see how is my thought and chain of thinking.</q></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Proposed both: a raw, chronological log that quotes the candidate exactly, plus the full session exported with <code>/export</code>.</p></div>
+    <div class="bubble human"><div class="who">Candidate</div><q>ok lets do bowth.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">This log, plus <code>transcript.md</code>.</div>
+  </div>
+</section>
+
+<!-- Q19 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q19 · Should a human be the final gate on tests?</h2><span class="badge pushback">Candidate pushed back</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>I think this is good, but it's still unit tests and integration tests. There is any skills you have to plan a test plan with test cases? so that human should be the final gate when implementing a feature request like this.</q></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Proposed a test plan with numbered Given/When/Then cases, approved before any code, then TDD, then a manual UAT checklist. Also mentioned the <code>gsd-verify-work</code> plugin.</p></div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>well gsd is plugins for solo development workflow. but I think tdd is good enough for this case. human might need to test manually to verify their intent.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">A test plan approved by the candidate, then TDD, then a manual UAT checklist the candidate runs. The GSD plugin suggestion was rejected.</div>
+  </div>
+</section>
+
+<h2 style="margin:32px 0 14px">Phase 3 · Working rules</h2>
+
+<!-- Q20 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q20 · What format should the docs use?</h2><span class="badge overrode">Candidate overrode AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Had written the spec and decision log in Markdown. Asked whether to add the untracked <code>.omc/</code> plugin folder to <code>.gitignore</code>.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>no, just remove the .omc. and I think for better visual, can you make those docs to be in html, let says beutify it. that's my rules for this project as we need better visual to read and understand. the decisions logs should be formatted as question and anwser. it's easy to read. when everything is done, then I will compact the session and we can start the implementation plan.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Every planning doc is now HTML sharing one stylesheet (<code>assets/style.css</code>). The decision log is in question-and-answer form. <code>.omc/</code> was deleted. The repository <code>README.md</code> stays Markdown so GitHub renders it.</div>
+  </div>
+</section>
+
+<footer class="doc-footer">Raw decision log · Read alongside the <a href="plan/2026-10-08-work-tracker-design.html">design spec</a></footer>
+</main>
+</body>
+</html>

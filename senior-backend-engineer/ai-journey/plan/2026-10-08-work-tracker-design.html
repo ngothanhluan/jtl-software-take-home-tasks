@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkTracker Design Spec</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main class="page">
+
+<header class="doc-header">
+  <div class="eyebrow">Design spec · Senior Backend take-home</div>
+  <h1>WorkTracker</h1>
+  <p class="lede">A .NET 8 modular monolith with two modules, Users and WorkItems, built with FastEndpoints, CQRS and DDD.</p>
+  <div class="meta">
+    <span class="chip">Date <strong>2026-10-08</strong></span>
+    <span class="chip">Status <strong>Approved after written review</strong></span>
+    <span class="chip">Branch <strong>feature/backend-take-home</strong></span>
+    <span class="chip">Decisions <a href="../decisions.html"><strong>decisions.html</strong></a></span>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#goal">Goal</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#domain">Domain model</a></li>
+    <li><a href="#api">API</a></li>
+    <li><a href="#flow">Request flow (CQRS)</a></li>
+    <li><a href="#errors">Error handling</a></li>
+    <li><a href="#concurrency">Concurrency</a></li>
+    <li><a href="#idempotency">Idempotency</a></li>
+    <li><a href="#testing">Testing</a></li>
+    <li><a href="#deliverables">Deliverables</a></li>
+  </ol>
+</nav>
+
+<!-- 1 -->
+<section id="goal">
+  <h2><span class="num">01</span>Goal</h2>
+  <p>A small .NET 8 service, organized as a <strong>modular monolith</strong>, using <strong>FastEndpoints</strong>, <strong>CQRS</strong> and <strong>DDD</strong>, with two modules:</p>
+  <ul>
+    <li><strong>Users</strong>: create a user by username; get a user by ID.</li>
+    <li><strong>WorkItems</strong>: create a work item with a name and an assignee (user ID); list work items by assignee.</li>
+  </ul>
+  <p>The brief grades module boundaries, a deliberate domain model, a clean command/query split, thin endpoints, testability, clarity, and the AI journey. Time box 2–4 hours, with no gold-plating.</p>
+  <div class="callout">
+    <div class="callout-title">Guiding principle (set by the candidate)</div>
+    <p>Simple, easy to read, easy to maintain. Build what the brief asks for. Document what it doesn't ask for instead of building it, unless we chose to build it deliberately (see <a href="#idempotency">§08</a>).</p>
+  </div>
+</section>
+
+<!-- 2 -->
+<section id="architecture">
+  <h2><span class="num">02</span>Architecture</h2>
+  <p><strong>Vertical slices inside each module, with the domain model in its own folder.</strong> We chose this over Clean Architecture's project-per-layer, which would mean about 8 projects for 4 endpoints and reading one use case across 4 projects.</p>
+
+  <h3>Projects and references</h3>
+  <div class="diagram">
+    <div class="diagram-row">
+      <div class="node host">
+        <div class="name">WorkTracker.Host</div>
+        <div class="desc">Program.cs, exception → ProblemDetails, Idempotency/</div>
+        <div class="refs">→ Users, WorkItems, Shared, FastEndpoints, FastEndpoints.Swagger</div>
+      </div>
+    </div>
+    <div class="arrow">references ↓</div>
+    <div class="diagram-row">
+      <div class="node module">
+        <div class="name">WorkTracker.Users</div>
+        <div class="desc">Domain/, Features/, Infrastructure/, UsersModule.cs</div>
+        <div class="refs">→ Users.Contracts, Shared, FastEndpoints</div>
+      </div>
+      <div class="node module">
+        <div class="name">WorkTracker.WorkItems</div>
+        <div class="desc">Domain/, Features/, Infrastructure/, WorkItemsModule.cs</div>
+        <div class="refs">→ <strong>Users.Contracts only</strong> (never Users), Shared, FastEndpoints</div>
+      </div>
+    </div>
+    <div class="arrow">references ↓</div>
+    <div class="diagram-row">
+      <div class="node contract">
+        <div class="name">WorkTracker.Users.Contracts</div>
+        <div class="desc"><code>IUsersApi</code>, the only cross-module surface</div>
+        <div class="refs">→ nothing</div>
+      </div>
+      <div class="node shared">
+        <div class="name">WorkTracker.Shared</div>
+        <div class="desc">The 3 exception types only</div>
+        <div class="refs">→ nothing</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Folder layout</h3>
+<pre><code>senior-backend-engineer/
+├── WorkTracker.sln
+├── requests.http                              all calls, error cases, manual UAT checklist
+├── src/
+│   ├── WorkTracker.Host/
+│   ├── WorkTracker.Shared/
+│   └── Modules/
+│       ├── Users/
+│       │   ├── WorkTracker.Users/
+│       │   └── WorkTracker.Users.Contracts/
+│       └── WorkItems/
+│           └── WorkTracker.WorkItems/
+└── tests/
+    ├── WorkTracker.Users.Tests/
+    ├── WorkTracker.WorkItems.Tests/
+    └── WorkTracker.Api.Tests/</code></pre>
+  <p>Every project name starts with <code>WorkTracker.</code>. It reads clearly, and FastEndpoints skips some assembly names when it scans for endpoints.</p>
+
+  <h3>Boundary rules</h3>
+  <ul>
+    <li>The boundary <strong>between modules</strong> is the project-reference graph. WorkItems has no reference to Users, so it can't touch Users' types at all.</li>
+    <li>Everything inside a module project is <code>internal</code> (the C# default; we just never write <code>public</code>). This guards the projects that <em>do</em> reference a module, namely the Host and the tests: <code>Program.cs</code> can't construct a repository or an aggregate directly. A module's public surface is exactly its <code>Add&lt;Module&gt;Module(this IServiceCollection)</code> extension and, for Users, its Contracts project.</li>
+    <li>Modules never share domain types. Only primitives (<code>Guid</code>, <code>string</code>) cross a boundary.</li>
+    <li>Each module owns its own data store, and no module can see another's.</li>
+    <li><code>Shared</code> holds exception types only, never business concepts.</li>
+    <li>Each module declares <code>InternalsVisibleTo</code> for its own test project.</li>
+  </ul>
+</section>
+
+<!-- 3 -->
+<section id="domain">
+  <h2><span class="num">03</span>Domain model</h2>
+  <div class="callout green">
+    <p>We use value objects <strong>only where a rule lives</strong>. IDs are plain <code>Guid</code>; a strongly-typed ID per aggregate was judged too much ceremony for two aggregates. Aggregates have private constructors and factory methods, so they can never be in an invalid state.</p>
+  </div>
+
+  <h3>Users</h3>
+  <ul>
+    <li><code>Username</code>: a value object. It's trimmed and required, 3–32 characters, and allows only letters, digits, <code>.</code>, <code>_</code> and <code>-</code>. Equality ignores case. A broken rule throws <code>DomainException</code> with a specific message, such as <code>"Username is required."</code> or <code>"Username must be between 3 and 32 characters."</code>.</li>
+    <li><code>User</code>: the aggregate root. It has a private constructor and <code>User.Create(Username)</code>, and exposes <code>Guid Id</code> and <code>Username Username</code>. There are no setters and no methods that change it.</li>
+    <li><code>IUserRepository</code> (in <code>Domain/</code>):
+      <ul>
+        <li><code>Task&lt;bool&gt; TryAddAsync(User user, CancellationToken ct)</code> is atomic. It returns <code>false</code> if the username is already taken (ignoring case).</li>
+        <li><code>Task&lt;User?&gt; GetByIdAsync(Guid id, CancellationToken ct)</code></li>
+        <li><code>Task&lt;bool&gt; ExistsAsync(Guid id, CancellationToken ct)</code></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>WorkItems</h3>
+  <ul>
+    <li><code>WorkItemName</code>: a value object. It's trimmed and required, 1–200 characters. A broken rule throws <code>DomainException</code>.</li>
+    <li><code>WorkItem</code>: the aggregate root, created with <code>WorkItem.Create(WorkItemName name, Guid assigneeId)</code>. It throws <code>DomainException("Assignee id is required.")</code> for <code>Guid.Empty</code>. It exposes <code>Guid Id</code>, <code>WorkItemName Name</code> and <code>Guid AssigneeId</code>. There's no status, due date and so on, because nothing asks for them.</li>
+    <li><code>IWorkItemRepository</code> (in <code>Domain/</code>):
+      <ul>
+        <li><code>Task AddAsync(WorkItem item, CancellationToken ct)</code></li>
+        <li><code>Task&lt;IReadOnlyList&lt;WorkItem&gt;&gt; GetByAssigneeAsync(Guid assigneeId, CancellationToken ct)</code></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>Cross-module contract</h3>
+<pre><code>// WorkTracker.Users.Contracts
+public interface IUsersApi
+{
+    Task&lt;bool&gt; UserExistsAsync(Guid userId, CancellationToken ct);
+}</code></pre>
+  <p>An internal <code>UsersApi</code> class in the Users module implements it, using <code>IUserRepository</code>, and <code>AddUsersModule()</code> registers it. WorkItems checks assignees through it <strong>synchronously</strong>.</p>
+
+  <h3>Persistence portability (documented, not built)</h3>
+  <p>Changing the data store doesn't change the domain model. Only <code>Infrastructure/</code> changes.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Store</th><th>How it maps</th></tr>
+    <tr><td><strong>SQL via EF Core</strong></td><td>One <code>DbContext</code> and one schema per module (<code>users.Users</code>, <code>workitems.WorkItems</code>). <code>Username</code> maps to a single <code>nvarchar(32)</code> column through <code>HasConversion(u =&gt; u.Value, s =&gt; new Username(s))</code>, with a unique index that ignores case. <code>TryAddAsync</code> catches the unique-violation <code>DbUpdateException</code> and returns <code>false</code>. EF Core copes with the private constructor and private setters. <strong>There's no foreign key</strong> from <code>WorkItems.AssigneeId</code> to <code>Users.Id</code>, because that would couple the modules at the database level.</td></tr>
+    <tr><td><strong>IDs</strong></td><td><code>Guid</code> suits in-memory storage because the app generates it, with no round trip to a database. With SQL the candidate prefers <code>int</code>/<code>long</code> identity columns (or sequential UUIDv7), and the repository would then return the generated ID.</td></tr>
+    <tr><td><strong>Document store</strong></td><td>One document per aggregate, with the value object stored as a plain field.</td></tr>
+  </table></div>
+
+<pre><code>users.Users                               workitems.WorkItems
+  Id        uniqueidentifier  PK            Id          uniqueidentifier  PK
+  Username  nvarchar(32)      UNIQUE        Name        nvarchar(200)
+                                            AssigneeId  uniqueidentifier  INDEX  (no FK)</code></pre>
+</section>
+
+<!-- 4 -->
+<section id="api">
+  <h2><span class="num">04</span>API</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Endpoint</th><th>Success</th><th>Errors</th></tr>
+    <tr><td><code>POST /users</code><br><code>{ "username" }</code></td><td>201 <code>{ id, username }</code> + <code>Location: /users/{id}</code></td><td>400 invalid · 409 username taken</td></tr>
+    <tr><td><code>GET /users/{id}</code></td><td>200 <code>{ id, username }</code></td><td>404 not found</td></tr>
+    <tr><td><code>POST /work-items</code><br><code>{ "name", "assigneeId" }</code></td><td>201 <code>{ id, name, assigneeId }</code></td><td>400 invalid · 422 unknown assignee</td></tr>
+    <tr><td><code>GET /work-items?assigneeId={id}</code></td><td>200 <code>[ { id, name, assigneeId } ]</code>, empty if there are none</td><td>400 missing or empty id</td></tr>
+  </table></div>
+  <ul>
+    <li>Both POSTs require an <code>Idempotency-Key</code> header (<a href="#idempotency">§08</a>).</li>
+    <li><code>POST /work-items</code> returns 201 without a <code>Location</code> header. There's no get-single-work-item endpoint, and we don't add one.</li>
+    <li><code>GET /work-items</code> does <strong>not</strong> check that the user exists; an unknown assignee returns <code>[]</code>. Reads never call another module.</li>
+    <li>Each module owns its own URL space (<code>/users</code>, <code>/work-items</code>).</li>
+    <li>Swagger UI comes from <code>FastEndpoints.Swagger</code>. <code>requests.http</code> covers every call and every error case.</li>
+  </ul>
+</section>
+
+<!-- 5 -->
+<section id="flow">
+  <h2><span class="num">05</span>Request flow (CQRS)</h2>
+  <p><strong>CQRS uses FastEndpoints' built-in command bus.</strong> Commands and queries both implement <code>ICommand&lt;TResult&gt;</code>. Three things keep them apart:</p>
+  <ul>
+    <li>their names (<code>*Command</code> or <code>*Query</code>);</li>
+    <li>the rule that query handlers never change state;</li>
+    <li>the rule that a command and a query never share a handler.</li>
+  </ul>
+  <p>We rejected MediatR because it went commercial. The accepted cost is that handlers depend on FastEndpoints, which the modules already reference for their endpoints.</p>
+  <p>Each use case gets one feature folder. For example, <code>Features/CreateWorkItem/</code> holds <code>CreateWorkItemEndpoint.cs</code>, <code>CreateWorkItemCommand.cs</code>, <code>CreateWorkItemHandler.cs</code> and <code>CreateWorkItemRequest.cs</code>. The response DTOs (<code>UserResponse</code>, <code>WorkItemResponse</code>) are shared within their module.</p>
+
+<pre><code>HTTP POST /work-items
+ └─ CreateWorkItemEndpoint            maps Request → Command (one line), no logic
+     └─ command.ExecuteAsync(ct)       FastEndpoints command bus
+         └─ CreateWorkItemHandler
+             ├─ new WorkItemName(cmd.Name)            → DomainException (400)
+             ├─ usersApi.UserExistsAsync(...)         → false: BusinessRuleViolationException (422)
+             ├─ WorkItem.Create(name, cmd.AssigneeId) → DomainException if empty (400)
+             ├─ repository.AddAsync(workItem)
+             └─ return WorkItemResponse (DTO)
+     └─ Send.ResponseAsync(response, 201)</code></pre>
+
+  <h3>Rules</h3>
+  <ul>
+    <li><strong>Endpoints</strong> map the request to a command or query, execute it, and send the response. Nothing else.</li>
+    <li><strong>Handlers</strong> run the use case: they build value objects, call the aggregate and save. They return <strong>DTOs, never domain objects</strong>.</li>
+    <li><strong>Query handlers</strong> only read and map. They never change state.</li>
+  </ul>
+
+  <h3>Validation: each rule lives in exactly one place</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Layer</th><th>Checks</th><th>Result</th></tr>
+    <tr><td>FastEndpoints binding</td><td>malformed JSON, IDs that aren't GUIDs</td><td>400</td></tr>
+    <tr><td>Value objects / aggregate factory</td><td>rules about a single object (required, length, characters, empty assignee)</td><td>400</td></tr>
+    <tr><td>Handlers</td><td>rules that need data (username taken, assignee exists)</td><td>409 / 422</td></tr>
+  </table></div>
+  <p>We don't use FastEndpoints validators, because they would repeat the domain rules.</p>
+</section>
+
+<!-- 6 -->
+<section id="errors">
+  <h2><span class="num">06</span>Error handling</h2>
+  <p><strong>Exceptions for broken rules, <code>null</code> for not found.</strong> Each exception is named after the kind of failure, not the layer that handles it. <code>Shared</code> defines them:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Exception</th><th>Thrown from</th><th>Meaning</th><th>HTTP</th></tr>
+    <tr><td><code>DomainException</code></td><td><code>Domain/</code></td><td>a rule of a single object is broken</td><td>400</td></tr>
+    <tr><td><code>ConflictException</code></td><td>handlers</td><td>the thing already exists (username taken)</td><td>409</td></tr>
+    <tr><td><code>BusinessRuleViolationException</code></td><td>handlers</td><td>a rule involving other data fails (unknown assignee)</td><td>422</td></tr>
+  </table></div>
+  <ul>
+    <li>Every exception carries a specific, readable message, written where the rule lives. Examples: <code>"Username 'alice' already exists."</code>, <code>"User '3f2a…' does not exist."</code></li>
+    <li>One <code>IExceptionHandler</code> in the Host turns them into <strong>ProblemDetails</strong> (RFC 9457) and puts the message in <code>detail</code>. Any other exception becomes a generic 500 that exposes no internal details.</li>
+    <li>Query handlers return <code>null</code> when nothing is found, and the endpoint sends a 404 with <code>"User '{id}' was not found."</code></li>
+    <li>FastEndpoints is set to <code>Errors.UseProblemDetails()</code>, so its own binding errors come back in the same format.</li>
+  </ul>
+<pre><code>HTTP/1.1 409 Conflict
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Username 'alice' already exists."
+}</code></pre>
+</section>
+
+<!-- 7 -->
+<section id="concurrency">
+  <h2><span class="num">07</span>Concurrency</h2>
+  <ul>
+    <li><strong>Username uniqueness is enforced atomically.</strong> <code>InMemoryUserRepository</code> keeps a second <code>ConcurrentDictionary</code> keyed by the lower-cased username, and <code>TryAdd</code> succeeds for exactly one caller. When <code>TryAddAsync</code> returns <code>false</code>, the handler throws <code>ConflictException</code>. There's no separate check before the add. In production, the equivalent is a unique index plus catching the violation.</li>
+    <li><strong>Work items</strong> have no uniqueness rule, so adding them concurrently is already safe.</li>
+    <li><strong>Aggregates never change after creation</strong>, so readers can't see half-changed data.</li>
+  </ul>
+  <div class="callout amber">
+    <div class="callout-title">Update concurrency: documented, not built</div>
+    <p>There are no update use cases yet. When there are: a <code>Version</code> on each aggregate, compare-and-swap in the repository, and a 409 on mismatch. Over HTTP that becomes an ETag and <code>If-Match</code> header, answered with 412.</p>
+  </div>
+</section>
+
+<!-- 8 -->
+<section id="idempotency">
+  <h2><span class="num">08</span>Idempotency <span class="badge overrode">Deliberate addition</span></h2>
+  <p>This protects both POST endpoints against double submission, such as a double click.</p>
+  <ul>
+    <li>The client sends an <code>Idempotency-Key</code> header and <strong>reuses the same key when it retries</strong>.</li>
+    <li>The server remembers each key for a configurable window (<code>Idempotency:WindowSeconds</code>, default <strong>10</strong>).</li>
+  </ul>
+  <div class="table-wrap"><table>
+    <tr><th>Situation</th><th>Response</th></tr>
+    <tr><td>Header missing or empty</td><td>400 <code>"Idempotency-Key header is required."</code></td></tr>
+    <tr><td>First request with the key</td><td>handled normally; the 2xx response (status, body, <code>Location</code>) is stored</td></tr>
+    <tr><td>Same key + same request within the window</td><td>stored response replayed with header <code>Idempotent-Replayed: true</code>; nothing created</td></tr>
+    <tr><td>Same key, first request still in progress</td><td>409 <code>"A request with this Idempotency-Key is already being processed."</code></td></tr>
+    <tr><td>Same key, different endpoint or body</td><td>422 <code>"Idempotency-Key was already used with a different request."</code></td></tr>
+    <tr><td>First request failed (4xx/5xx)</td><td>key released, so the client can retry with the same key</td></tr>
+    <tr><td>After the window</td><td>key forgotten; the request is handled as new</td></tr>
+  </table></div>
+
+  <h3>Design</h3>
+  <ul>
+    <li>It lives entirely in <code>WorkTracker.Host/Idempotency/</code>. It's an HTTP concern, so the modules and the domain don't know it exists.</li>
+    <li><code>IdempotencyPreProcessor</code> (<code>IGlobalPreProcessor</code>) and <code>IdempotencyPostProcessor</code> (<code>IGlobalPostProcessor</code>) are attached to POST endpoints only, through <code>c.Endpoints.Configurator</code>.</li>
+    <li>A request is identified by its endpoint route plus a SHA-256 hash of the request DTO serialized as JSON.</li>
+    <li><code>IdempotencyStore</code> is a singleton built on a <code>ConcurrentDictionary</code> keyed by the idempotency key:
+      <ul>
+        <li><strong>Reserving a key is atomic</strong> (<code>TryAdd</code>, or <code>TryUpdate</code> over an expired entry).</li>
+        <li>Each reservation also removes expired entries, so memory holds only the keys from the current window.</li>
+        <li>Time comes from an injected <code>TimeProvider</code>.</li>
+      </ul>
+    </li>
+    <li>If the handler throws, the post-processor releases the key and lets the exception go on to the ProblemDetails handler.</li>
+  </ul>
+  <div class="callout amber">
+    <div class="callout-title">Known trade-off</div>
+    <p>A 10-second window covers double clicks, but not slow automatic retries. A client that times out at 30 seconds and then retries with the same key gets a duplicate. The window is configurable, and payment APIs such as Stripe keep keys for 24 hours. In production the equivalent is Redis <code>SET key NX EX &lt;window&gt;</code>, which also works across several instances.</p>
+  </div>
+</section>
+
+<!-- 9 -->
+<section id="testing">
+  <h2><span class="num">09</span>Testing</h2>
+  <ul>
+    <li><strong>xUnit + Shouldly 4.3.0</strong> (BSD-3-Clause). We avoided FluentAssertions because it went commercial. We considered AwesomeAssertions too, but it keeps the <code>FluentAssertions</code> namespace, which would mislead readers.</li>
+    <li><strong>Test plan first.</strong> <code>ai-journey/plan/test-plan.html</code> lists numbered cases (<code>TC-U01</code>, …) in Given/When/Then form, and the candidate approves it before any code is written. Each test method name includes its case ID, so every test traces back to the plan.</li>
+    <li><strong>TDD</strong> while implementing: write the test, watch it fail, make it pass.</li>
+    <li><strong>Manual UAT</strong> is the final gate: a checklist at the end of <code>requests.http</code> that the candidate runs against the live service.</li>
+  </ul>
+  <div class="table-wrap"><table>
+    <tr><th>Project</th><th>Covers</th><th>Demonstrates</th></tr>
+    <tr><td><code>Users.Tests</code></td><td>valid and invalid <code>Username</code> cases; <code>CreateUserHandler</code> throws <code>ConflictException</code> on a duplicate (real in-memory repository)</td><td>rules live in the domain; handlers can be tested without mocking frameworks</td></tr>
+    <tr><td><code>WorkItems.Tests</code></td><td><code>WorkItemName</code> rules; <code>WorkItem.Create</code> rejects an empty assignee; <code>CreateWorkItemHandler</code> with a stub <code>IUsersApi</code> that returns <code>false</code> → <code>BusinessRuleViolationException</code></td><td>the contract lets WorkItems be tested without the Users module</td></tr>
+    <tr><td><code>Api.Tests</code></td><td><code>WebApplicationFactory&lt;Program&gt;</code>: happy path for all 4 endpoints; 409, 422 and 404 over HTTP; idempotent replay; the different-body 422; <code>IdempotencyStore</code> expiry with <code>FakeTimeProvider</code></td><td>the whole system working over real HTTP</td></tr>
+  </table></div>
+  <p>Handler tests create the handlers directly with their dependencies, without going through the command bus.</p>
+</section>
+
+<!-- 10 -->
+<section id="deliverables">
+  <h2><span class="num">10</span>Deliverables</h2>
+  <div class="table-wrap"><table>
+    <tr><th>File</th><th>Contents</th></tr>
+    <tr><td><code>README.md</code></td><td>About half a page of design, followed by build, run and test instructions and how to call the endpoints. The design part covers:
+      <ul>
+        <li>module boundaries and how commands and queries flow;</li>
+        <li>trade-offs: layers separated only by folders, handlers tied to FastEndpoints, atomic username uniqueness, the idempotency window vs Redis, update concurrency, <code>Guid</code> vs <code>int</code> IDs, and the EF Core mapping;</li>
+        <li>the "more time" direction: eventual consistency between modules through <code>UserCreated</code> events.</li>
+      </ul>
+      It stays Markdown so GitHub renders it.</td></tr>
+    <tr><td><code>requests.http</code></td><td>Every call, the error cases, and the manual UAT checklist.</td></tr>
+    <tr><td><code>ai-journey/plan/</code></td><td>This spec, the test plan and the implementation plan, as produced.</td></tr>
+    <tr><td><code>ai-journey/decisions.html</code></td><td>Raw decision log in question-and-answer form, quoting the candidate's messages exactly.</td></tr>
+    <tr><td><code>ai-journey/transcript.md</code></td><td>The full session, which the candidate exports with Claude Code's <code>/export</code>.</td></tr>
+    <tr><td><code>ai-journey/prompts</code></td><td>The key prompts, curated.</td></tr>
+    <tr><td><code>ai-journey/toolchain</code></td><td>Tools and models used:
+      <ul>
+        <li>Claude Code. Opus 5.5 for brainstorming and the first spec draft, Fable 5.1 for the written spec review, then Opus 5.5 again (the candidate switched models with <code>/model</code>).</li>
+        <li>superpowers skills: brainstorming, writing-plans, test-driven-development.</li>
+        <li>The context7 MCP server for FastEndpoints docs.</li>
+        <li>The NuGet API and web search for the assertion-library check.</li>
+      </ul></td></tr>
+    <tr><td><code>ai-journey/judgment</code></td><td>Where the candidate overrode, corrected or pushed back on the AI. Taken from the decision log and extended during code review.</td></tr>
+  </table></div>
+  <p>Commits are small, one per step, on the <code>feature/backend-take-home</code> branch.</p>
+</section>
+
+<footer class="doc-footer">WorkTracker design spec · Decision history in <a href="../decisions.html">decisions.html</a></footer>
+</main>
+</body>
+</html>
