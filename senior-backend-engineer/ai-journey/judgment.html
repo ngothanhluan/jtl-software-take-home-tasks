@@ -40,7 +40,15 @@
 
 <section>
   <h2><span class="num">02</span>Code review</h2>
-  <p>Added after the whole-branch review and the candidate's manual UAT (Task 10): what the candidate rejected or changed in the AI's code.</p>
+  <p>A fresh Opus reviewer checked the whole branch and found 0 critical, 1 important (fixed test-first before UAT) and 5 minor points. The candidate ran the manual UAT (all 10 passed), then decided each minor point (<a href="decisions.html">Q26</a>).</p>
+  <div class="table-wrap"><table>
+    <tr><th>Point</th><th>The AI recommended</th><th>The candidate decided</th><th>Why it mattered</th></tr>
+    <tr><td class="tc">#1 <span class="badge overrode">Overrode</span></td><td>Leave bad-JSON and bad-GUID errors in FastEndpoints' own format, since they are still a correct 400.</td><td>Beautify them.</td><td>Every error now has one shape and a plain message, and the JSON parser's internal text no longer reaches clients.</td></tr>
+    <tr><td class="tc">#2 <span class="badge agreed">Agreed</span></td><td>Stop logging expected 4xx as failures.</td><td>Log only unexpected errors.</td><td>No stack traces for a duplicate username, while real 500s are still logged with the exception.</td></tr>
+    <tr><td class="tc">#3 <span class="badge agreed">Agreed</span></td><td>Leave the slow-request key expiry, which can't happen in memory.</td><td>Leave it; revisit for a real database.</td><td>No code for a case this app can't reach. Noted in the README.</td></tr>
+    <tr><td class="tc">#4 <span class="badge pushback">Pushed back</span></td><td>Leave the parsed-request fingerprint, which is arguably better than raw bytes.</td><td>Leave it, for a different reason: clients are our own browser and APIs and follow our conventions.</td><td>The edge case is a question of API contract, not of code.</td></tr>
+    <tr><td class="tc">#5 <span class="badge agreed">Agreed</span></td><td>Optional: two lines for 415/405 bodies.</td><td>Not necessary.</td><td>Kept the code smaller for a case only broken tooling hits.</td></tr>
+  </table></div>
 </section>
 
 <footer class="doc-footer">WorkTracker · AI journey · <a href="decisions.html">decision log</a> · <a href="prompts.html">prompts</a> · <a href="toolchain.html">toolchain</a></footer>

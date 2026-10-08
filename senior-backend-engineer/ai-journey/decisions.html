@@ -23,8 +23,8 @@
 </header>
 
 <div class="stats">
-  <div class="stat"><div class="value">22</div><div class="label">decisions</div></div>
-  <div class="stat"><div class="value" style="color:var(--red)">5</div><div class="label">candidate overrode the AI</div></div>
+  <div class="stat"><div class="value">26</div><div class="label">decisions</div></div>
+  <div class="stat"><div class="value" style="color:var(--red)">6</div><div class="label">candidate overrode the AI</div></div>
   <div class="stat"><div class="value" style="color:var(--amber)">3</div><div class="label">candidate pushed back</div></div>
   <div class="stat"><div class="value" style="color:var(--violet)">2</div><div class="label">candidate caught an AI mistake</div></div>
 </div>
@@ -381,12 +381,80 @@
   <div class="qa-body">
     <div class="qa-label">Question</div>
     <div class="bubble ai"><div class="who">AI</div>
-      <p>Wrote the <a href="plan/2026-10-08-work-tracker-implementation-plan.html">implementation plan</a> as HTML, following the Q20 rule: 10 test-first tasks with full code, 46 tests, a Review Focus list of 5 extra inputs, and 4 refinements of the spec. Asked the candidate to review it and pick an execution method.</p></div>
+      <p>Wrote the <a href="plan/2026-10-08-work-tracker-implementation-plan.md">implementation plan</a> as HTML, following the Q20 rule: 10 test-first tasks with full code, 46 tests, a Review Focus list of 5 extra inputs, and 4 refinements of the spec. Asked the candidate to review it and pick an execution method.</p></div>
     <div class="qa-label">Answer</div>
     <div class="bubble human"><div class="who">Candidate</div>
       <q>well thank you, I don't really need an html implementation plan. but looks good.</q></div>
     <div class="qa-label">Outcome</div>
     <div class="outcome">Plan approved, including the 4 spec refinements. The HTML rule narrowed: implementation plans don't need to be HTML; the spec, test plan, decision log and ai-journey pages still are. This plan stays as it is.</div>
+  </div>
+</section>
+
+<h2 style="margin:32px 0 14px">Phase 4 · Build and review</h2>
+
+<!-- Q23 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q23 · How should the plan be executed?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Offered two ways to run the plan: a fresh subagent per task with a reviewer after each, or the AI building every task itself in this session with one fresh reviewer for the whole branch at the end. The candidate dismissed the question.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>let follow the implementation plan and start building it.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">Built inline, task by task, test-first, one commit per task, with a progress ledger that survived context compaction. One fresh Opus reviewer checked the whole branch at the end.</div>
+  </div>
+</section>
+
+<!-- Q24 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q24 · Windows blocked the build output. What now?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Tests failed to load <code>WorkTracker.Shared.dll</code>: "An Application Control policy has blocked this file". The Code Integrity event log showed Windows Smart App Control blocking the unsigned DLL. A rebuild workaround was unreliable, so the AI stopped and asked rather than keep guessing.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>well, try again</q></div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>ah see, I already turned that off, please try one more time</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">The candidate turned Smart App Control off. Tests have run normally since; the workaround was dropped.</div>
+  </div>
+</section>
+
+<!-- Q25 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q25 · Does the finished app pass the manual UAT?</h2><span class="badge agreed">Agreed with AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>All tasks done and reviewed. The reviewer found one important issue (an empty error body when the client sent <code>Accept: text/html</code>), fixed test-first. Asked the candidate to run UAT-01..10 from <code>requests.http</code> against the running app.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>looks good to me, I have manually tested all off that. I can confirmed the tests are passed.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">UAT-01..10 passed by hand, and the candidate confirmed the automated suite is green. The human gate from Q19 is met.</div>
+  </div>
+</section>
+
+<!-- Q26 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q26 · Which of the reviewer's five minor points are worth fixing?</h2><span class="badge overrode">Candidate overrode AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Went through each minor point: how likely it is, what a user would notice, and what a fix costs. Recommended fixing only #2 (expected 4xx logged as failures with stack traces). Recommended leaving #1 (bad JSON and bad GUIDs answered in FastEndpoints' own error format, echoing parser text), #3 (a request slower than 10 s outliving its idempotency key) and #4 (the idempotency fingerprint uses the parsed request). Called #5 (empty 415/405 bodies) optional.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>1. well I think you're right, I'd like to beautify this. please do<br>
+2. absolutely right, I think we only need to log unexpected error.<br>
+3. just leave it. this is in memory database, we can consider for a real world application.<br>
+4. well I think this is not right, because in a team, client should be browser or other APIs that under our control, and those one should be follow our convention and rules.<br>
+5. well I don't think this is necessary from my perspective.</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">#1 fixed, against the AI's recommendation: unreadable requests now get the same problem details shape as every other error, with a plain message ("The request body is not valid JSON.", "'id' has an invalid value."). #2 fixed: only unexpected 500s are logged. #3 left and noted in the README. #4 left, because clients are our own and follow our conventions. #5 left. Both fixes were made test-first; suite 52/52.</div>
   </div>
 </section>
 
