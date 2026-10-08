@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Toolchain</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="page">
+
+<header class="doc-header">
+  <div class="eyebrow">AI journey · Toolchain</div>
+  <h1>Tools used to build WorkTracker</h1>
+  <p class="lede">What the candidate and the AI used, and what each was for.</p>
+  <div class="meta">
+    <span class="chip">Date <strong>2026-10-08</strong></span>
+    <span class="chip">Also <a href="decisions.html"><strong>decisions</strong></a></span>
+    <span class="chip">Also <a href="prompts.html"><strong>prompts</strong></a></span>
+    <span class="chip">Also <a href="judgment.html"><strong>judgment</strong></a></span>
+  </div>
+</header>
+
+<section>
+  <h2><span class="num">01</span>Agent and models</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Tool</th><th>Used for</th></tr>
+    <tr><td>Claude Code CLI on Windows</td><td>The whole session: reading the brief, the design conversation, writing the docs and the code, running <code>dotnet</code> and <code>git</code>.</td></tr>
+    <tr><td>Opus 5.5</td><td>Brainstorming and the first spec draft (Q1–Q11), then the HTML docs, the test plan, the implementation plan and the build (Q20 on).</td></tr>
+    <tr><td>Fable 5.1</td><td>Answering the candidate's written spec review (Q12–Q19). The candidate switched models with <code>/model</code>.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2><span class="num">02</span>Process skills (superpowers plugin)</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Skill</th><th>Used for</th></tr>
+    <tr><td><code>brainstorming</code></td><td>One question at a time, options with a recommendation, then the design spec section by section.</td></tr>
+    <tr><td><code>writing-plans</code></td><td>The implementation plan: 10 tasks, exact code, a failing command and a passing command per step, and a Review Focus list.</td></tr>
+    <tr><td><code>executing-plans</code></td><td>Building the plan in this session, with a progress ledger that survives context compaction and one whole-branch review at the end.</td></tr>
+    <tr><td><code>test-driven-development</code></td><td>Every task: write the test, watch it fail for the right reason, write the code, watch it pass.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2><span class="num">03</span>Research</h2>
+  <ul>
+    <li><strong>context7 MCP server:</strong> current FastEndpoints docs on global pre/post processors, post-processors running when the handler throws, <code>ProcessorState</code>, and the <code>Send</code> methods. The idempotency design relies on these.</li>
+    <li><strong>NuGet API:</strong> exact package versions and .NET 8 support, so the pinned versions in the plan were checked rather than remembered.</li>
+    <li><strong>Web search:</strong> the FluentAssertions licence change and the alternatives (Q17), which led to Shouldly.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">04</span>Keeping the record</h2>
+  <ul>
+    <li><strong><code>/export</code> and <code>/compact</code>:</strong> the session outgrew the context window. Before compacting, the candidate exported it to <code>transcript.md</code>. Later parts go to <code>transcript-part2.md</code> so nothing is overwritten.</li>
+    <li><strong>Decision log:</strong> each decision was added to <code>decisions.html</code> when it was made, quoting the candidate verbatim.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">05</span>Hooks and the environment</h2>
+  <ul>
+    <li><strong>impeccable design hooks</strong> checked the HTML docs after each write. They flagged thick coloured side stripes, a heavy top border on the diagram cards, and all-caps body text. All were fixed in <code>assets/style.css</code> rather than suppressed.</li>
+    <li><strong>oh-my-claudecode plugin</strong> kept recreating a <code>.omc/</code> state folder. The candidate asked for it to be deleted, not git-ignored. So it is removed before every commit, and only explicit paths are staged.</li>
+    <li><strong>Windows Smart App Control</strong> blocked the unsigned <code>WorkTracker.Shared.dll</code> during Task 2–3 test runs ("An Application Control policy has blocked this file"). The AI found the cause in the Code Integrity event log. A rebuild workaround proved unreliable. The candidate turned Smart App Control off, and tests have run natively since.</li>
+  </ul>
+</section>
+
+<footer class="doc-footer">WorkTracker · AI journey · <a href="decisions.html">decision log</a> · <a href="prompts.html">prompts</a> · <a href="judgment.html">judgment</a></footer>
+</main>
+</body>
+</html>

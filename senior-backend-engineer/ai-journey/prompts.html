@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key Prompts</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="page">
+
+<header class="doc-header">
+  <div class="eyebrow">AI journey · Key prompts</div>
+  <h1>The prompts that shaped the build</h1>
+  <p class="lede">The candidate's prompts that changed the outcome, in order, quoted exactly as typed (typos included). Each has one line on what it caused. The full context for each one is in the <a href="decisions.html">decision log</a> and <code>transcript.md</code>.</p>
+  <div class="meta">
+    <span class="chip">Date <strong>2026-10-08</strong></span>
+    <span class="chip">Also <a href="decisions.html"><strong>decisions</strong></a></span>
+    <span class="chip">Also <a href="toolchain.html"><strong>toolchain</strong></a></span>
+    <span class="chip">Also <a href="judgment.html"><strong>judgment</strong></a></span>
+  </div>
+</header>
+
+<section>
+  <h2><span class="num">01</span>Opening the session</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>/superpowers:brainstorming this repo is a home work test from an interview for role senior backend engineer. Please read the readme from the root repo and the senior back end engineer folder then help me to complete the task. if there is any question, please ask. if there is anything unclear, please ask.</q></div>
+  <p><strong>Caused:</strong> an ask-first process. The AI asked one design question at a time before writing any spec or code, and kept asking whenever something was unclear.</p>
+</section>
+
+<section>
+  <h2><span class="num">02</span>The guiding principle</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>I think A, but which architecture we're following? clean architecture or vertical slice? remember simple is the best, easy to read, easy to maintenance</q></div>
+  <p><strong>Caused:</strong> vertical slices per module instead of Clean Architecture layers (Q2). Every later choice was checked against "simple is the best".</p>
+</section>
+
+<section>
+  <h2><span class="num">03</span>Choosing the CQRS mechanism</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>as Mediatr goes commercial I think I will go with fastendpoint. as CQRS pattern is how we control, use it, not just because its name. the implementation class can be name *Query while implemting the ICommand interface. I think it does not matter</q></div>
+  <p><strong>Caused:</strong> the AI's hand-written interfaces were dropped for the FastEndpoints command bus (Q3). The command/query split is kept by naming and use.</p>
+</section>
+
+<section>
+  <h2><span class="num">04</span>Specific error messages</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>agree on option1. Also just want to push back the error handling. is that error return with specific error message? I expect that it would be something "Username is already existed" when checking username uniqueness</q></div>
+  <p><strong>Caused:</strong> every error carries a specific message in the problem details <code>detail</code> field (Q6). The test plan then fixed the exact wording.</p>
+</section>
+
+<section>
+  <h2><span class="num">05</span>Validation and concurrency</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>it looks right, but I just want to follow up with some questions, there is the validation? also we should handle the concurrency issue with adding/updating data.</q></div>
+  <p><strong>Caused:</strong> the AI found a race in its own design: a username check followed by a separate add. Uniqueness became one atomic <code>TryAddAsync</code> (Q7), now tested by TC-U05.</p>
+</section>
+
+<section>
+  <h2><span class="num">06</span>Double clicks and the idempotency window</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>no, the requirement does not mention it. but should we handle idempotency, when somehow user double click? and create 2 same workitem?</q></div>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>no I mean we still need idempotency key require from the client and use that key for 10s window. how that sound?</q></div>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>oh, good to know that trade off. but retrying should not change the idempotency key, I think. other stuffs are good for me.</q></div>
+  <p><strong>Caused:</strong> the AI wanted to only document idempotency; the candidate had it built (Q9). The design is a required <code>Idempotency-Key</code> with a 10-second window. The candidate also corrected the AI's wording about retries (Q10).</p>
+</section>
+
+<section>
+  <h2><span class="num">07</span>The written spec review</h2>
+  <p>The candidate reviewed the spec in a browser and sent eight comments at once. The ones that changed it:</p>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>I don't think the name SharedKernel is too formal, why not just Shared? make it simple.</q></div>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>Tell me why we need value object here? any tradeoff, why not just POCO? looks like we over complicated? if so explain why?</q></div>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>Instead of this beautified decision log. can we make it raw, because I think the interviewer would like to see how is my thought and chain of thinking.</q></div>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>I think this is good, but it's still unit tests and integration tests. There is any skills you have to plan a test plan with test cases? so that human should be the final gate when implementing a feature request like this.</q></div>
+  <p><strong>Caused:</strong> the project was renamed to <code>WorkTracker.Shared</code>. Value objects were cut to <code>Username</code> and <code>WorkItemName</code>. The decision log became a raw log quoting the candidate. A test plan approved before code became the gate (Q12–Q19).</p>
+</section>
+
+<section>
+  <h2><span class="num">08</span>Docs format and approvals</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>no, just remove the .omc. and I think for better visual, can you make those docs to be in html, let says beutify it. that's my rules for this project as we need better visual to read and understand. the decisions logs should be formatted as question and anwser. it's easy to read.</q></div>
+  <div class="bubble human"><div class="who">Candidate</div><q>approved</q></div>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>well thank you, I don't really need an html implementation plan. but looks good.</q></div>
+  <p><strong>Caused:</strong> HTML docs that share one stylesheet (Q20). The test plan was approved unchanged (Q21) and the implementation plan was approved (Q22).</p>
+</section>
+
+<section>
+  <h2><span class="num">09</span>Implementation</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>let follow the implementation plan and start building it.</q></div>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>ah see, I already turned that off, please try one more time</q></div>
+  <p><strong>Caused:</strong> the AI built the ten tasks itself, test-first, one commit per task. Windows Smart App Control blocked the unsigned test DLLs part-way through. The candidate turned it off, and the build continued natively.</p>
+</section>
+
+<footer class="doc-footer">WorkTracker · AI journey · <a href="decisions.html">decision log</a> · <a href="toolchain.html">toolchain</a> · <a href="judgment.html">judgment</a></footer>
+</main>
+</body>
+</html>
