@@ -11,8 +11,8 @@
 
 <header class="doc-header">
   <div class="eyebrow">AI journey · Judgment</div>
-  <h1>Where the candidate overruled the AI</h1>
-  <p class="lede">Every time the candidate overrode, corrected or pushed back on the AI, taken from the <a href="decisions.html">decision log</a>. The AI's proposals were often reasonable; these are the places the candidate's call made the result simpler or more correct.</p>
+  <h1>My judgment of the AI</h1>
+  <p class="lede">Written by the candidate. The evidence behind it is in the <a href="decisions.html">decision log</a>.</p>
   <div class="meta">
     <span class="chip">Date <strong>2026-10-08</strong></span>
     <span class="chip">Also <a href="decisions.html"><strong>decisions</strong></a></span>
@@ -22,33 +22,8 @@
 </header>
 
 <section>
-  <h2><span class="num">01</span>Design</h2>
-  <div class="table-wrap"><table>
-    <tr><th>Q</th><th>The AI proposed</th><th>The candidate decided</th><th>Why it mattered</th></tr>
-    <tr><td class="tc">Q3 <span class="badge overrode">Overrode</span></td><td>Hand-written <code>ICommand</code>/<code>IQuery</code> interfaces, no library.</td><td>Use the FastEndpoints command bus; keep the split by naming (<code>*Command</code>, <code>*Query</code>).</td><td>One less homemade abstraction. CQRS is a way of working, not an interface name.</td></tr>
-    <tr><td class="tc">Q6 <span class="badge pushback">Pushed back</span></td><td>Problem details, without saying how specific the messages were.</td><td>Every error must say exactly what is wrong, e.g. "Username 'alice' already exists."</td><td>Readable errors became a requirement, and the test plan asserts the exact text.</td></tr>
-    <tr><td class="tc">Q7 <span class="badge corrected">Corrected</span></td><td>Check the username is free, then add the user.</td><td>Asked about concurrency, which exposed the race.</td><td>Two requests at once could both pass the check. Uniqueness is now one atomic step, tested with 20 parallel adds.</td></tr>
-    <tr><td class="tc">Q9 <span class="badge overrode">Overrode</span></td><td>Document idempotency, don't build it; then argued against content-based dedup.</td><td>Build it: a required client <code>Idempotency-Key</code>, remembered for 10 seconds.</td><td>Stops double-click duplicates with a small, well-understood design, without the problems the AI raised about dedup.</td></tr>
-    <tr><td class="tc">Q10 <span class="badge corrected">Corrected</span></td><td>Described the trade-off as if a retry used a new key.</td><td>A retry keeps its key; the real limit is the server forgetting it after 10 seconds.</td><td>Correct wording in the README. It also led the AI to fix its own claim about memory: expired keys are now purged.</td></tr>
-    <tr><td class="tc">Q13 <span class="badge overrode">Overrode</span></td><td><code>WorkTracker.SharedKernel</code>.</td><td><code>WorkTracker.Shared</code>.</td><td>Plain names over DDD jargon.</td></tr>
-    <tr><td class="tc">Q15 <span class="badge pushback">Pushed back</span></td><td>Value objects, including strongly-typed IDs.</td><td>Value objects only where a rule lives (<code>Username</code>, <code>WorkItemName</code>); plain <code>Guid</code> IDs. Asked how it maps to SQL with EF Core.</td><td>Four fewer types. Persistence portability was added to the spec and README.</td></tr>
-    <tr><td class="tc">Q18 <span class="badge overrode">Overrode</span></td><td>A polished decision table.</td><td>A raw log quoting the candidate, plus the full transcript.</td><td>Reviewers can see the actual reasoning, not a tidy summary.</td></tr>
-    <tr><td class="tc">Q19 <span class="badge pushback">Pushed back</span></td><td>Unit and integration tests only; suggested the GSD plugin.</td><td>A numbered test plan approved before code, TDD, then manual UAT by the candidate. GSD rejected.</td><td>The human is the final gate on whether the feature does what was meant.</td></tr>
-    <tr><td class="tc">Q20 <span class="badge overrode">Overrode</span></td><td>Markdown docs; git-ignore the plugin folder.</td><td>Beautified HTML docs with a Q&amp;A decision log; delete <code>.omc/</code> instead of ignoring it.</td><td>Docs that are easy to read and review; no plugin traces in the repo.</td></tr>
-  </table></div>
-</section>
-
-<section>
-  <h2><span class="num">02</span>Code review</h2>
-  <p>A fresh Opus reviewer checked the whole branch and found 0 critical, 1 important (fixed test-first before UAT) and 5 minor points. The candidate ran the manual UAT (all 10 passed), then decided each minor point (<a href="decisions.html">Q26</a>).</p>
-  <div class="table-wrap"><table>
-    <tr><th>Point</th><th>The AI recommended</th><th>The candidate decided</th><th>Why it mattered</th></tr>
-    <tr><td class="tc">#1 <span class="badge overrode">Overrode</span></td><td>Leave bad-JSON and bad-GUID errors in FastEndpoints' own format, since they are still a correct 400.</td><td>Beautify them.</td><td>Every error now has one shape and a plain message, and the JSON parser's internal text no longer reaches clients.</td></tr>
-    <tr><td class="tc">#2 <span class="badge agreed">Agreed</span></td><td>Stop logging expected 4xx as failures.</td><td>Log only unexpected errors.</td><td>No stack traces for a duplicate username, while real 500s are still logged with the exception.</td></tr>
-    <tr><td class="tc">#3 <span class="badge agreed">Agreed</span></td><td>Leave the slow-request key expiry, which can't happen in memory.</td><td>Leave it; revisit for a real database.</td><td>No code for a case this app can't reach. Noted in the README.</td></tr>
-    <tr><td class="tc">#4 <span class="badge pushback">Pushed back</span></td><td>Leave the parsed-request fingerprint, which is arguably better than raw bytes.</td><td>Leave it, for a different reason: clients are our own browser and APIs and follow our conventions.</td><td>The edge case is a question of API contract, not of code.</td></tr>
-    <tr><td class="tc">#5 <span class="badge agreed">Agreed</span></td><td>Optional: two lines for 415/405 bodies.</td><td>Not necessary.</td><td>Kept the code smaller for a case only broken tooling hits.</td></tr>
-  </table></div>
+  <h2>In my own words</h2>
+  <p>The AI is helping a lot on clarify the requirement, make the goal clear and help to consult several things, even though sometime it over engineer. In this project as I think using value object is a good approach as the object can validate itself instead of using validator. Also the downside of using AI for software development is they adding too many tests. like there is some tests actually don't need and I have to get it review again to remove redundant tests or less worth tests.</p>
 </section>
 
 <footer class="doc-footer">WorkTracker · AI journey · <a href="decisions.html">decision log</a> · <a href="prompts.html">prompts</a> · <a href="toolchain.html">toolchain</a></footer>
