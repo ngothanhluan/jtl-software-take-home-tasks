@@ -1,7 +1,7 @@
 # WorkTracker — Design Spec
 
 Date: 2026-10-08
-Status: Approved in conversation section by section; awaiting final review of this document.
+Status: Approved by the candidate after a written review (see `../decisions.md` for the raw log).
 
 ## 1. Goal
 
@@ -29,10 +29,10 @@ across 4 projects.
 ```
 senior-backend-engineer/
 ├── WorkTracker.sln
-├── requests.http
+├── requests.http                              all calls, error cases, manual UAT checklist
 ├── src/
 │   ├── WorkTracker.Host/                      Program.cs, exception → ProblemDetails, Idempotency/
-│   ├── WorkTracker.SharedKernel/              the 3 exception types only
+│   ├── WorkTracker.Shared/                    the 3 exception types only
 │   └── Modules/
 │       ├── Users/
 │       │   ├── WorkTracker.Users/             Domain/, Features/, Infrastructure/, UsersModule.cs
@@ -50,48 +50,53 @@ assembly names from endpoint scanning.
 
 | Project | References |
 |---|---|
-| Host | Users, WorkItems, SharedKernel, FastEndpoints, FastEndpoints.Swagger |
-| SharedKernel | — |
-| Users | Users.Contracts, SharedKernel, FastEndpoints |
+| Host | Users, WorkItems, Shared, FastEndpoints, FastEndpoints.Swagger |
+| Shared | — |
+| Users | Users.Contracts, Shared, FastEndpoints |
 | Users.Contracts | — |
-| WorkItems | **Users.Contracts only** (never Users), SharedKernel, FastEndpoints |
+| WorkItems | **Users.Contracts only** (never Users), Shared, FastEndpoints |
 
 ### 2.2 Boundary rules
 
-- Everything inside a module project is `internal`. A module's public surface is exactly its
+- The boundary **between modules** is the project-reference graph: WorkItems has no reference to
+  Users, so it cannot touch Users' types at all.
+- Everything inside a module project is `internal` (the C# default — we simply never write `public`).
+  This guards the projects that *do* reference a module (the Host and tests): `Program.cs` cannot
+  construct a repository or an aggregate directly. A module's public surface is exactly its
   `Add<Module>Module(this IServiceCollection)` extension and, for Users, its Contracts project.
 - Modules never share domain types. Only primitives (`Guid`, `string`) cross a boundary.
 - Each module owns its own data store; no module can see another's.
-- `SharedKernel` holds exception types only — never business concepts.
-- Test projects get access to internals via `InternalsVisibleTo`, declared by each module.
+- `Shared` holds exception types only — never business concepts.
+- Each module declares `InternalsVisibleTo` for its own test project.
 
 ## 3. Domain model
 
+Value objects exist **only where a rule lives**. IDs are plain `Guid` (a strongly-typed ID per
+aggregate was judged ceremony for two aggregates). Aggregates have private constructors and factory
+methods, so they are never in an invalid state.
+
 ### 3.1 Users
 
-- `UserId` — value object wrapping `Guid`; `UserId.New()`.
 - `Username` — value object. Trimmed; required; 3–32 characters; only letters, digits, `.`, `_`, `-`.
   Equality is case-insensitive. Violations throw `DomainException` with a specific message
   (e.g. `"Username is required."`, `"Username must be between 3 and 32 characters."`).
-- `User` — aggregate root. Private constructor; `User.Create(Username)`; exposes `Id`, `Username`.
-  No setters, no mutating methods.
+- `User` — aggregate root. Private constructor; `User.Create(Username)`; exposes `Guid Id`,
+  `Username Username`. No setters, no mutating methods.
 - `IUserRepository` (in `Domain/`):
   - `Task<bool> TryAddAsync(User user, CancellationToken ct)` — atomic; returns `false` if the
     username (case-insensitive) is already taken.
-  - `Task<User?> GetByIdAsync(UserId id, CancellationToken ct)`
-  - `Task<bool> ExistsAsync(UserId id, CancellationToken ct)`
+  - `Task<User?> GetByIdAsync(Guid id, CancellationToken ct)`
+  - `Task<bool> ExistsAsync(Guid id, CancellationToken ct)`
 
 ### 3.2 WorkItems
 
-- `WorkItemId` — value object wrapping `Guid`.
 - `WorkItemName` — value object. Trimmed; required; 1–200 characters. Violations throw `DomainException`.
-- `AssigneeId` — WorkItems' **own** value object wrapping `Guid`; rejects `Guid.Empty`
-  (`"Assignee id is required."`). Deliberately not Users' `UserId`.
-- `WorkItem` — aggregate root. `WorkItem.Create(WorkItemName, AssigneeId)`; exposes `Id`, `Name`,
-  `AssigneeId`. No status, due date, etc. — not asked for.
+- `WorkItem` — aggregate root. `WorkItem.Create(WorkItemName name, Guid assigneeId)`; throws
+  `DomainException("Assignee id is required.")` for `Guid.Empty`. Exposes `Guid Id`,
+  `WorkItemName Name`, `Guid AssigneeId`. No status, due date, etc. — not asked for.
 - `IWorkItemRepository` (in `Domain/`):
   - `Task AddAsync(WorkItem item, CancellationToken ct)`
-  - `Task<IReadOnlyList<WorkItem>> GetByAssigneeAsync(AssigneeId assigneeId, CancellationToken ct)`
+  - `Task<IReadOnlyList<WorkItem>> GetByAssigneeAsync(Guid assigneeId, CancellationToken ct)`
 
 ### 3.3 Cross-module contract
 
@@ -107,6 +112,21 @@ public interface IUsersApi
 Implemented by an internal `UsersApi` class in the Users module (backed by `IUserRepository`) and
 registered in `AddUsersModule()`. WorkItems validates assignees **synchronously** through it.
 
+### 3.4 Persistence portability (documented, not built)
+
+The domain model does not change when the store changes; only `Infrastructure/` does.
+
+- **SQL via EF Core:** one `DbContext` and one schema per module (`users.Users`,
+  `workitems.WorkItems`). `Username` maps to a single `nvarchar(32)` column with
+  `HasConversion(u => u.Value, s => new Username(s))` and a unique, case-insensitive index;
+  `TryAddAsync` catches the unique-violation `DbUpdateException` and returns `false`. EF Core handles
+  the private constructor and private setters. **No foreign key** from `WorkItems.AssigneeId` to
+  `Users.Id` — that would couple the modules at the database level.
+- **IDs:** `Guid` suits in-memory storage (generated app-side, no round-trip). With SQL the candidate
+  would prefer `int`/`long` identity (or sequential UUIDv7); the repository would then return the
+  generated ID.
+- **Document store:** one document per aggregate; the value object serialises as a plain field.
+
 ## 4. API
 
 | Endpoint | Success | Errors |
@@ -116,7 +136,7 @@ registered in `AddUsersModule()`. WorkItems validates assignees **synchronously*
 | `POST /work-items` `{ "name", "assigneeId" }` | 201 `{ id, name, assigneeId }` | 400 invalid, 422 unknown assignee |
 | `GET /work-items?assigneeId={id}` | 200 `[ { id, name, assigneeId } ]` (empty if none) | 400 missing/empty id |
 
-- Both POSTs require an `Idempotency-Key` header (§6).
+- Both POSTs require an `Idempotency-Key` header (§8).
 - `POST /work-items` returns 201 without a `Location` header: there is no get-single-work-item
   endpoint and we do not add one.
 - `GET /work-items` does **not** check that the user exists — an unknown assignee returns `[]`.
@@ -143,9 +163,8 @@ HTTP POST /work-items
      └─ command.ExecuteAsync(ct)       FastEndpoints command bus
          └─ CreateWorkItemHandler
              ├─ new WorkItemName(cmd.Name)            → DomainException (400)
-             ├─ new AssigneeId(cmd.AssigneeId)        → DomainException (400)
              ├─ usersApi.UserExistsAsync(...)         → false: BusinessRuleViolationException (422)
-             ├─ WorkItem.Create(name, assigneeId)
+             ├─ WorkItem.Create(name, cmd.AssigneeId) → DomainException if empty (400)
              ├─ repository.AddAsync(workItem)
              └─ return WorkItemResponse (DTO)
      └─ Send.ResponseAsync(response, 201)
@@ -162,20 +181,21 @@ Rules:
   | Layer | Checks | Result |
   |---|---|---|
   | FastEndpoints binding | malformed JSON, non-GUID IDs | 400 |
-  | Value objects | single-value invariants (required, length, characters, empty GUID) | 400 |
+  | Value objects / aggregate factory | single-object invariants (required, length, characters, empty assignee) | 400 |
   | Handlers | rules needing data (username taken, assignee exists) | 409 / 422 |
 
-  No FastEndpoints validators — that would duplicate the value-object rules.
+  No FastEndpoints validators — that would duplicate the domain rules.
 
 ## 6. Error handling
 
-**Exceptions for rule violations, `null` for not-found.** `SharedKernel` defines:
+**Exceptions for rule violations, `null` for not-found.** Each exception is named for the kind of
+failure, not the layer that handles it. `Shared` defines:
 
-| Exception | HTTP |
-|---|---|
-| `DomainException` | 400 |
-| `ConflictException` | 409 |
-| `BusinessRuleViolationException` | 422 |
+| Exception | Thrown from | Meaning | HTTP |
+|---|---|---|---|
+| `DomainException` | `Domain/` | an invariant of a single object is broken | 400 |
+| `ConflictException` | handlers | the thing already exists (username taken) | 409 |
+| `BusinessRuleViolationException` | handlers | a rule involving other data fails (assignee unknown) | 422 |
 
 - Every exception carries a specific human-readable message written where the rule lives
   (e.g. `"Username 'alice' already exists."`, `"User '3f2a…' does not exist."`).
@@ -235,12 +255,19 @@ which also works across multiple instances.
 
 ## 9. Testing
 
-xUnit with plain `Assert` (FluentAssertions avoided — commercial license since v8).
+- **xUnit + Shouldly 4.3.0** (BSD-3-Clause). FluentAssertions was avoided because it went commercial;
+  AwesomeAssertions was considered but keeps the `FluentAssertions` namespace, which misleads readers.
+- **Test plan first.** `ai-journey/plan/test-plan.md` lists numbered cases (`TC-U01`, …) in
+  Given/When/Then form. The candidate approves it before implementation. Test method names carry the
+  case ID so plan → test is traceable.
+- **TDD** during implementation: write the test, see it fail, make it pass.
+- **Manual UAT** as the final gate: a checklist at the end of `requests.http` that the candidate runs
+  against the live service.
 
-| Project | Tests | Demonstrates |
+| Project | Covers | Demonstrates |
 |---|---|---|
-| `Users.Tests` | `Username` valid/invalid cases (theory); `CreateUserHandler` throws `ConflictException` on duplicate (real in-memory repo) | invariants in the domain; handlers testable without mocking frameworks |
-| `WorkItems.Tests` | `WorkItemName` / `AssigneeId` rules; `CreateWorkItemHandler` with a stub `IUsersApi` returning `false` → `BusinessRuleViolationException` | the contract lets WorkItems be tested without the Users module |
+| `Users.Tests` | `Username` valid/invalid cases; `CreateUserHandler` throws `ConflictException` on duplicate (real in-memory repo) | invariants in the domain; handlers testable without mocking frameworks |
+| `WorkItems.Tests` | `WorkItemName` rules; `WorkItem.Create` rejects empty assignee; `CreateWorkItemHandler` with a stub `IUsersApi` returning `false` → `BusinessRuleViolationException` | the contract lets WorkItems be tested without the Users module |
 | `Api.Tests` | `WebApplicationFactory<Program>`: happy path for all 4 endpoints; 409, 422, 404 over HTTP; idempotent replay; different-body 422; `IdempotencyStore` expiry with `FakeTimeProvider` | the system end to end over real HTTP |
 
 Handlers are tested by instantiating them directly with their dependencies (no command bus needed).
@@ -249,29 +276,24 @@ Handlers are tested by instantiating them directly with their dependencies (no c
 
 - `senior-backend-engineer/README.md` — about half a page of design (module boundaries, command/query
   flow, trade-offs: folder-level layering, FastEndpoints coupling, atomic uniqueness, idempotency
-  window vs Redis, update concurrency, eventual consistency between modules via `UserCreated` events
-  as the "more time" direction), followed by build/run/test instructions and how to call the endpoints.
-- `senior-backend-engineer/requests.http`.
+  window vs Redis, update concurrency, `Guid` vs `int` IDs, EF Core mapping per §3.4, eventual
+  consistency between modules via `UserCreated` events as the "more time" direction), followed by
+  build/run/test instructions and how to call the endpoints.
+- `senior-backend-engineer/requests.http` — every call, the error cases, and the manual UAT checklist.
 - `senior-backend-engineer/ai-journey/`:
-  - `plan/` — this spec and the implementation plan, as produced.
-  - `prompts.md` — curated key prompts from the session.
-  - `toolchain.md` — Claude Code (Opus 5.5); superpowers skills (brainstorming, writing-plans,
-    test-driven-development); context7 MCP for FastEndpoints docs.
-  - `judgment.md` — extracted from the conversation and extended during code review.
+  - `plan/` — this spec, the test plan and the implementation plan, as produced.
+  - `decisions.md` — raw chronological log: the candidate's messages verbatim, what the AI proposed,
+    what was chosen.
+  - `transcript.md` — the full session, exported with Claude Code's `/export` by the candidate.
+  - `prompts.md` — curated key prompts.
+  - `toolchain.md` — Claude Code; Opus 5.5 for brainstorming and the first spec draft, Fable 5.1 for
+    the written spec review, then Opus 5.5 again (the candidate switched models via `/model`); superpowers skills (brainstorming, writing-plans,
+    test-driven-development); context7 MCP for FastEndpoints docs; NuGet API and web search for the
+    assertion-library check.
+  - `judgment.md` — where the candidate overrode, corrected or pushed back on the AI, extracted from
+    `decisions.md` and extended during code review.
 - Small commits per step on branch `feature/backend-take-home`.
 
 ## 11. Decision log
 
-| # | Decision | Who | Notes |
-|---|---|---|---|
-| 1 | Assignee must exist; checked synchronously via `Users.Contracts` | Candidate (agreed with AI's recommendation) | Eventual consistency documented as the evolution path |
-| 2 | Vertical slices + `Domain/` folder, not Clean Architecture | Candidate asked; AI recommended | "Simple is the best, easy to read, easy to maintain" |
-| 3 | FastEndpoints command bus for CQRS | **Candidate overrode** AI's hand-rolled-interfaces recommendation | MediatR commercial; CQRS is about how it's used, not interface names |
-| 4 | In-memory repositories | Candidate | |
-| 5 | Exceptions + central ProblemDetails mapping; `null` for not-found | Candidate (agreed) | |
-| 6 | Error responses carry specific messages | **Candidate pushed back** to make this explicit | e.g. "Username 'alice' already exists." |
-| 7 | Atomic username uniqueness | **Candidate raised** concurrency | AI's design had a check-then-add race |
-| 8 | Update concurrency: document, don't build | Candidate | Not in requirements |
-| 9 | Idempotency-Key required on POSTs, 10s window | **Candidate overrode** AI's "document only" recommendation and designed the key + window combination | AI first read the window as content-based dedupe and argued against it (race, rule in the wrong layer); candidate clarified it was a client key with a short server-side window, which avoids both problems |
-| 10 | Retries reuse the key | **Candidate corrected** AI's wording | |
-| 11 | Expired-key purge on reserve | AI self-correction | Earlier claim that lazy replacement bounded memory was wrong |
+See `../decisions.md` — kept raw on purpose, in the candidate's own words.
