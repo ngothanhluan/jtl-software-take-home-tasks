@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Modules/WorkItems/WorkTracker.WorkItems/WorkTracker.WorkItems.csproj" />
+  </ItemGroup>
+</Project>

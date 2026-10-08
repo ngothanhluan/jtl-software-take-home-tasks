@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="FastEndpoints" Version="8.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Users/WorkTracker.Users.Contracts/WorkTracker.Users.Contracts.csproj" />
+    <ProjectReference Include="../../../WorkTracker.Shared/WorkTracker.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="WorkTracker.WorkItems.Tests" />
+  </ItemGroup>
+</Project>
