@@ -6,6 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="../WorkTracker.Shared/WorkTracker.Shared.csproj" />
     <ProjectReference Include="../Modules/Users/WorkTracker.Users/WorkTracker.Users.csproj" />
+    <ProjectReference Include="../Modules/WorkItems/WorkTracker.WorkItems/WorkTracker.WorkItems.csproj" />
   </ItemGroup>
 
   <ItemGroup>

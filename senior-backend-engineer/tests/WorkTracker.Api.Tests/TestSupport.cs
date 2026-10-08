@@ -31,6 +31,13 @@ internal static class TestSupport
         return (await response.Content.ReadFromJsonAsync<UserDto>())!;
     }
 
+    public static async Task<WorkItemDto> CreateWorkItemAsync(this HttpClient client, Guid assigneeId, string name)
+    {
+        var response = await client.PostWithKeyAsync("/work-items", new { name, assigneeId });
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        return (await response.Content.ReadFromJsonAsync<WorkItemDto>())!;
+    }
+
     public static async Task<ProblemDetails> ShouldBeProblemAsync(
         this HttpResponseMessage response, HttpStatusCode expectedStatus)
     {
