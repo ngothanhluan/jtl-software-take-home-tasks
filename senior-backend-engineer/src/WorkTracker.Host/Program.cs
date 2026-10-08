@@ -1,6 +1,7 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using WorkTracker.Host;
+using WorkTracker.Host.Idempotency;
 using WorkTracker.Users;
 using WorkTracker.WorkItems;
 
@@ -9,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services
     .AddProblemDetails()
     .AddExceptionHandler<ProblemDetailsExceptionHandler>()
+    .AddIdempotency(builder.Configuration)
     .AddUsersModule()
     .AddWorkItemsModule()
     .AddFastEndpoints(o => o.Assemblies = [typeof(UsersModule).Assembly, typeof(WorkItemsModule).Assembly])
@@ -17,7 +19,11 @@ builder.Services
 var app = builder.Build();
 
 app.UseExceptionHandler();
-app.UseFastEndpoints(c => c.Errors.UseProblemDetails());
+app.UseFastEndpoints(c =>
+{
+    c.Errors.UseProblemDetails();
+    c.Endpoints.Configurator = endpoint => endpoint.UseIdempotencyOnPosts();
+});
 app.UseSwaggerGen();
 
 app.Run();
