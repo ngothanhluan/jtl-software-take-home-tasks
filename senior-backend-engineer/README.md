@@ -8,13 +8,13 @@ A .NET 8 modular monolith with two modules, **Users** and **WorkItems**, built w
 
 **CQRS.** An endpoint maps the request to a command or query and runs it on the FastEndpoints command bus. `*Command` handlers change state, `*Query` handlers only read, and both return DTOs, never domain objects.
 
-**Domain.** `Username` and `WorkItemName` are value objects because they hold rules (length, characters, trimming). `User` and `WorkItem` have private constructors and `Create` factories, so they can't exist in an invalid state. A broken rule throws `DomainException` (400), a taken username `ConflictException` (409), an unknown assignee `BusinessRuleViolationException` (422). One exception handler turns them into RFC 9457 problem details with a specific message.
+**Domain.** `Username` and `WorkItemName` are value objects because they hold rules (length, characters, trimming). `User` and `WorkItem` have private constructors and `Create` factories, so they can't exist in an invalid state. A broken rule throws `DomainException` (400), a taken username `ConflictException` (409), an unknown assignee `BusinessRuleViolationException` (422). One exception handler turns them into RFC 9457 problem details with a specific message. A request that can't be read (malformed JSON, an id that isn't a GUID) gets the same shape with a plain message, not the parser's text. Only unexpected errors (500) are logged; expected 4xx are normal traffic.
 
 **Trade-offs**
 - Layers are folders, not projects: one use case lives in one folder. The compiler doesn't stop a handler from reaching into `Infrastructure/`; code review does.
 - Handlers implement FastEndpoints' `ICommandHandler` instead of MediatR, which is now commercial. The cost is that handlers depend on FastEndpoints.
 - Username uniqueness is atomic (`ConcurrentDictionary.TryAdd`). With SQL it would be a unique index plus catching the violation.
-- Both POSTs require an `Idempotency-Key`, remembered for 10 seconds (configurable) in process memory. That stops double clicks, not slow retries, and doesn't work across instances. Production would use Redis `SET NX EX` and a longer window.
+- Both POSTs require an `Idempotency-Key`, remembered for 10 seconds (configurable) in process memory. That stops double clicks, not slow retries, and doesn't work across instances. Production would use Redis `SET NX EX` and a longer window. A request slower than the window would also outlive its key; with in-memory storage that can't happen.
 - There are no update use cases, so no optimistic concurrency yet. It would be a `Version` per aggregate, exposed as an ETag with `If-Match` and 412.
 - IDs are `Guid` because the app generates them. With SQL I'd use `int`/`long` identity columns or UUIDv7. EF Core would map each value object to one column with `HasConversion`, use one schema per module, and have no foreign key between modules.
 

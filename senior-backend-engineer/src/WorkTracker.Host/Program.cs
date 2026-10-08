@@ -21,7 +21,7 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseFastEndpoints(c =>
 {
-    c.Errors.UseProblemDetails();
+    c.Errors.ResponseBuilder = RequestErrorResponse.Build;
     c.Endpoints.Configurator = endpoint => endpoint.UseIdempotencyOnPosts();
 });
 app.UseSwaggerGen();

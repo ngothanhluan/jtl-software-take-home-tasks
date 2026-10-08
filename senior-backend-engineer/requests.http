@@ -80,7 +80,7 @@ Content-Type: application/json
 
 { "username": "bob" }
 
-### 13. Malformed JSON -> 400
+### 13. Malformed JSON -> 400 "The request body is not valid JSON."
 POST {{baseUrl}}/users
 Content-Type: application/json
 Idempotency-Key: {{$guid}}
