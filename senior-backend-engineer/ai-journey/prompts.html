@@ -110,6 +110,20 @@
   <p><strong>Caused:</strong> the AI weighed each reviewer point by likelihood, visible effect and cost of fixing, rather than by its severity label. The candidate chose two fixes: error responses with one shape and plain messages, and logs that only record unexpected failures. Both were made test-first. See <a href="decisions.html">Q26</a>.</p>
 </section>
 
+<section>
+  <h2><span class="num">11</span>Fewer tests</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>2. I think the requirement is quite right, and the Ai problem is writing too much tests. which I think sometime there are some tests not necessary.</q></div>
+  <p><strong>Caused:</strong> the AI re-read the brief's "No exhaustive test coverage" line and cut the suite from 52 cases to 32, one or two per design point. See <a href="decisions.html">Q27</a>.</p>
+</section>
+
+<section>
+  <h2><span class="num">12</span>Checking against the brief</h2>
+  <div class="bubble human"><div class="who">Candidate</div>
+    <q>did you evaluate the whole project with [the six "What we evaluate" criteria] ultracode ?</q></div>
+  <p><strong>Caused:</strong> a 13-agent evaluation against the brief's own criteria, with a skeptic refuting each evaluator. All six came back Strong; the candidate accepted four of the five text fixes and turned UAT-10 into an exact check. See <a href="decisions.html">Q28</a>.</p>
+</section>
+
 <footer class="doc-footer">WorkTracker · AI journey · <a href="decisions.html">decision log</a> · <a href="toolchain.html">toolchain</a> · <a href="judgment.html">judgment</a></footer>
 </main>
 </body>

@@ -106,7 +106,7 @@
     <tr><td class="tc">TC-W03</td><td class="gwt"><b>Given</b> a valid name and <code>Guid.Empty</code> <b>When</b> <code>WorkItem.Create</code> is called <b>Then</b> it throws <code>DomainException</code> <code>"Assignee id is required."</code></td><td class="trace">Spec §03</td></tr>
     <tr><td class="tc">TC-W04</td><td class="gwt"><b>Given</b> <code>IUsersApi</code> says the user does not exist <b>When</b> <code>CreateWorkItemHandler</code> runs <b>Then</b> it throws <code>BusinessRuleViolationException</code> <code>"User '{id}' does not exist."</code> and nothing is saved.</td><td class="trace">Spec §05, Q1</td></tr>
     <tr><td class="tc">TC-W05</td><td class="gwt"><b>Given</b> <code>IUsersApi</code> says the user exists <b>When</b> the handler runs <b>Then</b> it returns a <code>WorkItemResponse</code> with a new id, the trimmed name and the assignee id, and the item is saved.</td><td class="trace">Spec §05</td></tr>
-    <tr><td class="tc">TC-W06</td><td class="gwt"><b>Given</b> 2 items for user A and 1 for user B <b>When</b> <code>ListWorkItemsByAssigneeHandler</code> runs for A, then for an unknown id <b>Then</b> it returns exactly A's 2 items, then an empty list.</td><td class="trace">Spec §04</td></tr>
+    <tr><td class="tc"><s>TC-W06</s></td><td class="gwt"><em>Cut after the build (Q27): TC-A08 checks the same thing over HTTP.</em> <b>Given</b> 2 items for user A and 1 for user B <b>When</b> <code>ListWorkItemsByAssigneeHandler</code> runs for A, then for an unknown id <b>Then</b> it returns exactly A's 2 items, then an empty list.</td><td class="trace">Spec §04</td></tr>
   </table></div>
 </section>
 
@@ -158,7 +158,7 @@
     <tr><td class="tc">UAT-07</td><td>Send the same create-work-item request twice quickly with the same key.</td><td>Second reply has <code>Idempotent-Replayed: true</code>; the list grows by 1.</td></tr>
     <tr><td class="tc">UAT-08</td><td>Wait more than 10 seconds and send it again with the same key.</td><td>A new item is created (the documented trade-off).</td></tr>
     <tr><td class="tc">UAT-09</td><td>Send a POST without <code>Idempotency-Key</code>.</td><td>400, header is required.</td></tr>
-    <tr><td class="tc">UAT-10</td><td>Send malformed JSON, and <code>GET /users/not-a-guid</code>.</td><td>400 or 404 in ProblemDetails form, never a stack trace.</td></tr>
+    <tr><td class="tc">UAT-10</td><td>Send malformed JSON, and <code>GET /users/not-a-guid</code>.</td><td>400 in ProblemDetails form, never a stack trace. <em>Tightened after the build (fix #1, Q26): 400 <code>"The request body is not valid JSON."</code> and 400 <code>"'id' has an invalid value."</code>, with no parser text.</em></td></tr>
   </table></div>
 </section>
 
@@ -175,6 +175,10 @@
   <div class="callout">
     <div class="callout-title">Approval</div>
     <p>Approved by the candidate on 2026-10-08 with no changes (<a href="../decisions.html">Q21</a>).</p>
+  </div>
+  <div class="callout amber">
+    <div class="callout-title">Trimmed after the build</div>
+    <p>During the build and review the suite grew to 52 cases. Before the human review the candidate had it cut back to the brief's "a few tests that show how you would test the design" (<a href="../decisions.html">Q27</a>): 32 cases now. TC-W06 was dropped; the other cases above keep their tests, with fewer <code>[Theory]</code> rows.</p>
   </div>
 </section>
 

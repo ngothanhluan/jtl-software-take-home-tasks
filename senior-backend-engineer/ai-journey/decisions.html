@@ -23,10 +23,10 @@
 </header>
 
 <div class="stats">
-  <div class="stat"><div class="value">26</div><div class="label">decisions</div></div>
+  <div class="stat"><div class="value">28</div><div class="label">decisions</div></div>
   <div class="stat"><div class="value" style="color:var(--red)">6</div><div class="label">candidate overrode the AI</div></div>
-  <div class="stat"><div class="value" style="color:var(--amber)">3</div><div class="label">candidate pushed back</div></div>
-  <div class="stat"><div class="value" style="color:var(--violet)">2</div><div class="label">candidate caught an AI mistake</div></div>
+  <div class="stat"><div class="value" style="color:var(--amber)">4</div><div class="label">candidate pushed back</div></div>
+  <div class="stat"><div class="value" style="color:var(--violet)">3</div><div class="label">candidate caught an AI mistake</div></div>
 </div>
 
 <div class="legend">
@@ -455,6 +455,46 @@
 5. well I don't think this is necessary from my perspective.</q></div>
     <div class="qa-label">Outcome</div>
     <div class="outcome">#1 fixed, against the AI's recommendation: unreadable requests now get the same problem details shape as every other error, with a plain message ("The request body is not valid JSON.", "'id' has an invalid value."). #2 fixed: only unexpected 500s are logged. #3 left and noted in the README. #4 left, because clients are our own and follow our conventions. #5 left. Both fixes were made test-first; suite 52/52.</div>
+  </div>
+</section>
+
+<!-- Q27 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q27 · Are all these tests needed?</h2><span class="badge corrected">Candidate corrected AI</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>alright, here is some thing we need to re-visit before I starting to doing human review.<br>
+1. read the instruction file again in senior backend folder and read the part What we evaluate and What you do NOT need to do<br>
+2. I think the requirement is quite right, and the Ai problem is writing too much tests. which I think sometime there are some tests not necessary.</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>Agreed. The brief says "No exhaustive test coverage. A few tests that show how you would test the design are worth more than chasing a coverage number", and lists logging as out of scope. The suite had grown to 52 cases, about a third of them repeats: the same check at two layers, extra rows of one rule, or FastEndpoints' own binding. Proposed keeping one or two tests per design point (domain rules, handlers with a stubbed <code>IUsersApi</code>, the two races, the HTTP contract, idempotency) and cutting the rest, including all logging tests.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>let do your recommendation first, let see how we go</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">52 cases cut to 32, still green. Removed: <code>ErrorLoggingTests</code> (3), the list-handler test that repeated TC-A08 (TC-W06), the handler copy of TC-W03, two binding-error tests, the work-item and empty-key variants of TC-I01, the user replay variant of TC-I02, the sequential "in progress" store test (the concurrent one covers it), and extra <code>[Theory]</code> rows (one per rule now). The <code>Accept: text/html</code> test stays: it pins the one real bug the review found.</div>
+  </div>
+</section>
+
+<!-- Q28 -->
+<section class="qa">
+  <div class="qa-head"><h2>Q28 · Does the project meet the brief's evaluation criteria?</h2><span class="badge pushback">Candidate pushed back</span></div>
+  <div class="qa-body">
+    <div class="qa-label">Question</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>did you evaluate the whole project with [the six "What we evaluate" criteria, pasted: module boundaries, DDD, CQRS, FastEndpoints usage, maintainability and testability, clarity] ultracode ?</q></div>
+    <div class="bubble ai"><div class="who">AI</div>
+      <p>No. The final review had checked the branch against the spec and the plan, not against the brief's criteria. The AI then ran a 13-agent workflow: one evaluator per criterion, one skeptic per criterion told to refute that evaluator's findings, and one synthesis. All six criteria came back Strong; 11 findings were refuted as documented trade-offs or taste. Five text-only fixes were proposed: (1) say in the README that queries implement <code>ICommand&lt;T&gt;</code>; (2) UAT-10 expects "400 or 404" but the app always returns 400; (3) the idempotency bullet says "Both POSTs" and omits what a client sees; (4) the comment in <code>WorkItemsModule.cs</code> says the host registers <code>IUsersApi</code>; (5) the README has no project layout.</p></div>
+    <div class="qa-label">Answer</div>
+    <div class="bubble human"><div class="who">Candidate</div>
+      <q>1. this is acceptable as Iincluded in the decision log.<br>
+2. oh we need re-visit it to make sure it meets the expectation. please bring it on<br>
+3. ok<br>
+4. please fix<br>
+5. please fix</q></div>
+    <div class="qa-label">Outcome</div>
+    <div class="outcome">#1 left: Q3 already records why queries use the command bus. #2 revisited: since fix #1 (Q26) the answer is always 400 with a plain message, and the trim in Q27 left UAT-10 as the only check for a bad id. UAT-10 now expects the exact two messages, <code>requests.http</code> gained request 14 (<code>GET /users/not-a-guid</code>), and both were checked against the running app. #3 the idempotency bullet now says every POST and lists replay, 422, 409 and key release. #4 the comment now names <code>AddUsersModule</code>. #5 the README opens its Design section with a project layout. Suite 32/32.</div>
   </div>
 </section>
 
